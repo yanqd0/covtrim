@@ -3,3 +3,12 @@ dist/
 coverage/
 *.tgz
 .DS_Store
+
+# .claude 整体忽略，仅放行已知的项目级设施
+.claude/*
+!.claude/agents/
+!.claude/skills/
+!.claude/commands/
+!.claude/hooks/
+!.claude/settings.json
+!.claude/settings.local.json
