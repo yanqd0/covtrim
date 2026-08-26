@@ -37,6 +37,25 @@ describe('toTsv', () => {
     toTsv(records);
     expect(records.map((r) => r.sourceFile)).toEqual(['z.ts', 'a.ts']);
   });
+
+  it('keeps spaces in source paths', () => {
+    const records: FileRecord[] = [{ sourceFile: 'my dir/a.ts', linesFound: 2, linesHit: 1 }];
+    expect(toTsv(records)).toContain('my dir/a.ts\t1\t2\t50.0');
+  });
+
+  it('sorts equal-uncovered rows by file path asc', () => {
+    const records: FileRecord[] = [
+      { sourceFile: 'c.ts', linesFound: 10, linesHit: 5 },
+      { sourceFile: 'b.ts', linesFound: 10, linesHit: 5 },
+      { sourceFile: 'a.ts', linesFound: 10, linesHit: 5 },
+      { sourceFile: 'z.ts', linesFound: 10, linesHit: 9 },
+    ];
+    const files = toTsv(records)
+      .split('\n')
+      .slice(1)
+      .map((l) => l.split('\t')[0]);
+    expect(files).toEqual(['a.ts', 'b.ts', 'c.ts', 'z.ts']);
+  });
 });
 
 describe('token estimation', () => {

@@ -37,4 +37,27 @@ describe('parseLcov', () => {
     const records = parseLcov('SF:a.ts\nLF:1\nLH:5\nend_of_record');
     expect(records[0]).toEqual({ sourceFile: 'a.ts', linesFound: 1, linesHit: 5 });
   });
+
+  it('parses CRLF line endings', () => {
+    const text = 'SF:a.ts\r\nLF:2\r\nLH:1\r\nend_of_record\r\n';
+    expect(parseLcov(text)).toEqual([{ sourceFile: 'a.ts', linesFound: 2, linesHit: 1 }]);
+  });
+
+  it('trims whitespace after the SF prefix', () => {
+    expect(parseLcov('SF:  a.ts\nLF:2\nLH:1\nend_of_record')).toEqual([
+      { sourceFile: 'a.ts', linesFound: 2, linesHit: 1 },
+    ]);
+  });
+
+  it('keeps negative LF as-is (data anomaly)', () => {
+    expect(parseLcov('SF:a.ts\nLF:-1\nLH:1\nend_of_record')).toEqual([
+      { sourceFile: 'a.ts', linesFound: -1, linesHit: 1 },
+    ]);
+  });
+
+  it('parses a record without a trailing newline', () => {
+    expect(parseLcov('SF:a.ts\nLF:2\nLH:1\nend_of_record')).toEqual([
+      { sourceFile: 'a.ts', linesFound: 2, linesHit: 1 },
+    ]);
+  });
 });

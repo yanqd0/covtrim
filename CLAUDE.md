@@ -14,7 +14,8 @@ Token 高效覆盖率压缩工具：读取标准 **lcov** → 输出紧凑 TSV�
 pnpm dev           # 开发运行（tsx）
 pnpm build         # 构建 → dist/
 pnpm test          # 测试（vitest）
-pnpm test:coverage # 覆盖率
+pnpm test:coverage # 覆盖率（含 lcov 报告）
+pnpm dogfood       # dogfooding：covtrim 压缩自身覆盖率 lcov
 pnpm lint          # ESLint
 pnpm check-types   # tsc --noEmit
 pnpm format        # Prettier

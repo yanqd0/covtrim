@@ -13,10 +13,12 @@ export class CLIExit extends Error {
   }
 }
 
+/* v8 ignore next 3 -- 默认输出通道，测试通过注入 io 替代 */
 const writeOut = (s: string): void => {
   process.stdout.write(`${s}\n`);
 };
 
+/* v8 ignore next 3 -- 默认输出通道，测试通过注入 io 替代 */
 const writeErr = (s: string): void => {
   process.stderr.write(`${s}\n`);
 };
@@ -69,6 +71,7 @@ export function main(argv: string[], io: CliIo = defaultIo): number {
   } catch (err) {
     if (err instanceof CLIExit) return err.code;
     if (err instanceof CommanderError) return err.exitCode;
+    /* v8 ignore next -- 仅捕获意外的非 CLI 错误 */
     throw err;
   }
   return 0;
@@ -100,6 +103,7 @@ function runReport(lcovFile: string, io: CliIo): number {
 }
 
 // 直接以 bin 运行时执行；被 import（测试）时不触发。
+/* v8 ignore next 3 -- bin 入口，子进程/手动运行才触发 */
 if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
   process.exit(main(process.argv));
 }

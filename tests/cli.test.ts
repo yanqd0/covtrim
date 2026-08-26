@@ -53,5 +53,22 @@ describe('covtrim CLI', () => {
       expect(code).toBe(1);
       expect(err.join('\n')).toContain('no coverage records');
     });
+
+    it('processes an edge-case lcov file', () => {
+      const { code, out } = run(['fixtures/edge.info']);
+      expect(code).toBe(0);
+      const files = out
+        .join('\n')
+        .split('\n')
+        .slice(1)
+        .map((l) => l.split('\t')[0]);
+      expect(files).toEqual(['dup.ts', 'dup.ts', 'zero.ts']);
+    });
+
+    it('exits 1 for an empty file', () => {
+      const { code, err } = run(['fixtures/empty.info']);
+      expect(code).toBe(1);
+      expect(err.join('\n')).toContain('no coverage records');
+    });
   });
 });

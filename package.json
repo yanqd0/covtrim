@@ -30,6 +30,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "dogfood": "pnpm test:coverage && tsx src/index.ts coverage/lcov.info",
     "lint": "eslint src tests",
     "format": "prettier --write .",
     "check-types": "tsc --noEmit",
