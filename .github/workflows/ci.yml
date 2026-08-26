@@ -1,0 +1,29 @@
+# CI 门禁：lint/types/test:coverage/build。push main + PR 触发，不发布。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm check-types
+      - run: pnpm test:coverage # 含 coverage thresholds 门禁（80/80/70/80）
+      - run: pnpm build

@@ -1,0 +1,68 @@
+# npm 发布：tag vX.Y.Z 激活；gate 校验 tag 与 package.json 版本一致 + stable 判定。
+# OIDC trusted publishing（permissions: id-token: write），npm publish --provenance 免 token。
+name: Publish npm
+
+on:
+  push:
+    tags: ['v*', '[0-9]+.[0-9]+.[0-9]+*']
+
+permissions:
+  id-token: write # OIDC 可信发布
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      is_stable: ${{ steps.check.outputs.is_stable }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "::error::tag($TAG) != package.json($VERSION)"; exit 1
+          fi
+          case "$VERSION" in
+            *-*) echo "is_stable=false" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "is_stable=true" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+  test:
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm check-types
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm pack:check
+
+  publish:
+    needs: [gate, test]
+    if: needs.gate.outputs.is_stable == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: npm install -g npm@11 # OIDC 发布需 npm >= 11.5.1
+      - run: npm publish --provenance --access public
