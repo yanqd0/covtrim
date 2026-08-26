@@ -1,26 +1,57 @@
 import { describe, expect, it } from 'vitest';
 import { main } from '../src/index.ts';
 
-function run(argv: string[]): { code: number; lines: string[] } {
-  const lines: string[] = [];
-  const code = main(['node', 'covtrim', ...argv], { stdout: (s) => lines.push(s) });
-  return { code, lines };
+function run(argv: string[]): { code: number; out: string[]; err: string[] } {
+  const out: string[] = [];
+  const err: string[] = [];
+  const code = main(['node', 'covtrim', ...argv], {
+    stdout: (s) => out.push(s),
+    stderr: (s) => err.push(s),
+  });
+  return { code, out, err };
 }
 
 describe('covtrim CLI', () => {
   it('prints a greeting for the hello command', () => {
-    const { code, lines } = run(['hello']);
+    const { code, out } = run(['hello']);
     expect(code).toBe(0);
-    expect(lines.join('\n')).toContain('Hello from covtrim');
+    expect(out.join('\n')).toContain('Hello from covtrim');
   });
 
   it('reports the version', () => {
-    const { lines } = run(['--version']);
-    expect(lines.join('\n')).toMatch(/\d+\.\d+\.\d+/);
+    const { out } = run(['--version']);
+    expect(out.join('\n')).toMatch(/\d+\.\d+\.\d+/);
   });
 
-  it('exits non-zero for an unknown command', () => {
-    const { code } = run(['bogus']);
-    expect(code).not.toBe(0);
+  describe('report (default command)', () => {
+    it('compresses an lcov file into sorted TSV', () => {
+      const { code, out, err } = run(['fixtures/sample.info']);
+      expect(code).toBe(0);
+      const tsv = out.join('\n');
+      expect(tsv.startsWith('file\tuncovered\ttotal\tpct')).toBe(true);
+      expect(tsv).toContain('src/bar.ts\t2\t3\t33.3');
+      expect(tsv).toContain('src/foo.ts\t2\t5\t60.0');
+      expect(tsv).toContain('src/baz.ts\t0\t2\t100.0');
+      // 未覆盖降序，同值按文件名升序：bar, foo, baz
+      expect(
+        tsv
+          .split('\n')
+          .slice(1)
+          .map((l) => l.split('\t')[0])
+      ).toEqual(['src/bar.ts', 'src/foo.ts', 'src/baz.ts']);
+      expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \(-?\d+%\)/);
+    });
+
+    it('exits 1 for a missing input file', () => {
+      const { code, err } = run(['nope.info']);
+      expect(code).toBe(1);
+      expect(err.join('\n')).toContain('cannot read');
+    });
+
+    it('exits 1 when no records are found', () => {
+      const { code, err } = run(['package.json']);
+      expect(code).toBe(1);
+      expect(err.join('\n')).toContain('no coverage records');
+    });
   });
 });
