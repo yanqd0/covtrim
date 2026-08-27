@@ -54,9 +54,10 @@ export function main(argv: string[], io: CliIo = defaultIo): number {
 
   program
     .argument('<lcovFile>', 'lcov coverage file to summarize')
+    .option('--tokens', 'print token usage stats to stderr')
     .description('Compress an lcov report into a compact TSV summary')
-    .action((lcovFile: string) => {
-      const code = runReport(lcovFile, io);
+    .action((lcovFile: string, opts: { tokens?: boolean }) => {
+      const code = runReport(lcovFile, io, opts.tokens === true);
       if (code !== 0) throw new CLIExit(code);
     });
 
@@ -78,11 +79,11 @@ export function main(argv: string[], io: CliIo = defaultIo): number {
 }
 
 /**
- * 读 lcov 文件 → 解析 → 输出 TSV 摘要；token 量化写 stderr。
+ * 读 lcov 文件 → 解析 → 输出 TSV 摘要；`--tokens` 时 token 量化写 stderr。
  *
  * @returns 退出码（0 成功，1 失败）
  */
-function runReport(lcovFile: string, io: CliIo): number {
+function runReport(lcovFile: string, io: CliIo, showTokens: boolean): number {
   let text: string;
   try {
     text = readFileSync(lcovFile, 'utf8');
@@ -97,8 +98,10 @@ function runReport(lcovFile: string, io: CliIo): number {
   }
   const tsv = toTsv(records);
   io.stdout(tsv);
-  const stats = tokenStats(text, tsv);
-  io.stderr(`tokens: ${stats.inputTokens} → ${stats.outputTokens} (-${stats.savedPct}%)`);
+  if (showTokens) {
+    const stats = tokenStats(text, tsv);
+    io.stderr(`tokens: ${stats.inputTokens} → ${stats.outputTokens} (-${stats.savedPct}%)`);
+  }
   return 0;
 }
 

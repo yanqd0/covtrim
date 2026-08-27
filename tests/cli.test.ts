@@ -39,6 +39,13 @@ describe('covtrim CLI', () => {
           .slice(1)
           .map((l) => l.split('\t')[0])
       ).toEqual(['src/bar.ts', 'src/foo.ts', 'src/baz.ts']);
+      expect(err.join('\n')).not.toContain('tokens:');
+    });
+
+    it('prints token stats only with --tokens', () => {
+      const { code, out, err } = run(['--tokens', 'fixtures/sample.info']);
+      expect(code).toBe(0);
+      expect(out.join('\n')).toContain('file\tuncovered\ttotal\tpct');
       expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \(-?\d+%\)/);
     });
 

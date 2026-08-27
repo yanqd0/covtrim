@@ -14,10 +14,11 @@ npx covtrim <args>
 ## Usage
 
 ```bash
-covtrim <lcovFile>   # 压缩 lcov → 未覆盖降序 TSV 摘要
-covtrim hello        # 打印问候（脚手架验证命令）
-covtrim --version    # 版本号
-covtrim --help       # 帮助
+covtrim <lcovFile>           # 压缩 lcov → 未覆盖降序 TSV 摘要
+covtrim <lcovFile> --tokens  # 附带 token 量化统计（写 stderr，默认关闭）
+covtrim hello                # 打印问候（脚手架验证命令）
+covtrim --version            # 版本号
+covtrim --help               # 帮助
 ```
 
 ## Why
