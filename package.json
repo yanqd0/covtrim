@@ -1,6 +1,6 @@
 {
   "name": "covtrim",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.1",
   "description": "Token-efficient coverage report compressor for LLM/agent consumption. Reads lcov, outputs compact TSV.",
   "type": "module",
   "bin": {
