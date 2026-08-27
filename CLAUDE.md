@@ -1,6 +1,6 @@
 # covtrim
 
-Token 高效覆盖率压缩工具：读取标准 **lcov** → 输出紧凑 TSV，供 LLM/agent 消费（省约一半 token）。核心命令随 0.2.0 提供；当前 0.1.0 为脚手架 + helloworld CLI。
+Token 高效覆盖率压缩工具：读取标准 **lcov** → 输出紧凑 TSV，供 LLM/agent 消费（省约一半 token）。0.1.0 已提供 `covtrim <lcov>` 核心命令。
 
 ## 目录
 

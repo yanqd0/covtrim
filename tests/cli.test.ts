@@ -49,6 +49,12 @@ describe('covtrim CLI', () => {
       expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \(-?\d+%\)/);
     });
 
+    it('shows a single minus even when output exceeds input (tiny input)', () => {
+      const { code, err } = run(['--tokens', 'fixtures/tiny.info']);
+      expect(code).toBe(0);
+      expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \(-\d+%\)/);
+    });
+
     it('exits 1 for a missing input file', () => {
       const { code, err } = run(['nope.info']);
       expect(code).toBe(1);

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command, CommanderError } from 'commander';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import pkg from '../package.json' with { type: 'json' };
 import { parseLcov } from './lcov.ts';
 import { toTsv, tokenStats } from './tsv.ts';
@@ -100,13 +101,20 @@ function runReport(lcovFile: string, io: CliIo, showTokens: boolean): number {
   io.stdout(tsv);
   if (showTokens) {
     const stats = tokenStats(text, tsv);
-    io.stderr(`tokens: ${stats.inputTokens} → ${stats.outputTokens} (-${stats.savedPct}%)`);
+    io.stderr(`tokens: ${stats.inputTokens} → ${stats.outputTokens} (-${Math.abs(stats.savedPct)}%)`);
   }
   return 0;
 }
 
-// 直接以 bin 运行时执行；被 import（测试）时不触发。
-/* v8 ignore next 3 -- bin 入口，子进程/手动运行才触发 */
-if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
-  process.exit(main(process.argv));
+// 直接以 bin 运行时执行（经 symlink 安装时 realpath 后仍命中）；被 import（测试）时不触发。
+/* v8 ignore start -- bin 入口，子进程/手动运行才触发 */
+if (process.argv[1]) {
+  try {
+    if (realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
+      process.exit(main(process.argv));
+    }
+  } catch {
+    // argv[1] 非可解析文件路径（库模式），跳过
+  }
 }
+/* v8 ignore stop */

@@ -29,8 +29,8 @@ covtrim --help               # 帮助
 
 ## Planned features
 
-- lcov parser (`SF` / `LF` / `LH` file-level counts)
-- Compact TSV summary sorted by uncovered lines (only low-coverage modules by default)
+- ✅ lcov parser (`SF` / `LF` / `LH` file-level counts) — implemented in 0.1.0
+- ✅ Compact TSV summary sorted by uncovered lines — implemented in 0.1.0
 - `--diff`: baseline regression detection (improved / regressed / newly-uncovered)
 - `--fail-under <N>`: CI gate with exit code
 - `--summary`: one-line digest for LLM context ("12 modules, 3 below 90%, needs X")

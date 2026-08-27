@@ -19,7 +19,7 @@ export function toTsv(records: FileRecord[]): string {
       (a, b) => b.uncovered - a.uncovered || a.record.sourceFile.localeCompare(b.record.sourceFile)
     )
     .map(({ record, uncovered }) =>
-      [record.sourceFile, String(uncovered), String(record.linesFound), formatPct(record)].join(
+      [record.sourceFile.replace(/\t/g, ' '), String(uncovered), String(record.linesFound), formatPct(record)].join(
         '\t'
       )
     );
