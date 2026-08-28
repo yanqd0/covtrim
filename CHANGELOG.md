@@ -7,6 +7,8 @@
 - Remove the scaffold `hello` command; `covtrim <lcovFile>` is now the only entry.
 - CI: upgrade `actions/checkout` & `actions/setup-node` to v5 (node24 runtime), dropping the Node 20 deprecation warning.
 - CI: publish to GitHub Packages as `@yanqd0/covtrim` and auto-create a GitHub Release (notes extracted from CHANGELOG).
+- Fix `--tokens` percentage sign when output grows (`+N%`, not `-N%`).
+- Fix publish workflow tag filter so bare-version tags (`0.1.1`) also trigger.
 - Docs: switch CHANGELOG to English; rewrite CLAUDE.md as a concise project navigation; add `notes/MEMORY.md`.
 - Docs: document dual-name install (`covtrim` / `@yanqd0/covtrim`) in README.
 
