@@ -93,7 +93,7 @@ function runReport(lcovFile: string, io: CliIo, showTokens: boolean): number {
   io.stdout(tsv);
   if (showTokens) {
     const stats = tokenStats(text, tsv);
-    io.stderr(`tokens: ${stats.inputTokens} → ${stats.outputTokens} (-${Math.abs(stats.savedPct)}%)`);
+    io.stderr(`tokens: ${stats.inputTokens} → ${stats.outputTokens} (${stats.savedPct >= 0 ? '-' : '+'}${Math.abs(stats.savedPct)}%)`);
   }
   return 0;
 }

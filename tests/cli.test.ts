@@ -40,13 +40,13 @@ describe('covtrim CLI', () => {
       const { code, out, err } = run(['--tokens', 'fixtures/sample.info']);
       expect(code).toBe(0);
       expect(out.join('\n')).toContain('file\tuncovered\ttotal\tpct');
-      expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \(-?\d+%\)/);
+      expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \(-\d+%\)/);
     });
 
-    it('shows a single minus even when output exceeds input (tiny input)', () => {
+    it('shows a plus when output exceeds input (tiny input)', () => {
       const { code, err } = run(['--tokens', 'fixtures/tiny.info']);
       expect(code).toBe(0);
-      expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \(-\d+%\)/);
+      expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \(\+\d+%\)/);
     });
 
     it('exits 1 for a missing input file', () => {
