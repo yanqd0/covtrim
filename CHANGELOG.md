@@ -4,14 +4,14 @@
 
 ### Features
 
-- covtrim CLI：读取 lcov 输出未覆盖降序的 TSV 摘要，供 LLM/agent 消费。
-  - TypeScript 脚手架（pnpm/tsup/vitest/ESLint/Prettier）。
-  - lcov 解析器（SF/LF/LH 文件级计数，容错）。
-  - token 量化默认关闭，`--tokens` 显式启用。
+- covtrim CLI: reads lcov and outputs a compact TSV summary sorted by uncovered lines, for LLM/agent consumption.
+  - TypeScript scaffold (pnpm/tsup/vitest/ESLint/Prettier).
+  - lcov parser (SF/LF/LH file-level counts, fault-tolerant).
+  - Token quantification off by default, enabled via `--tokens`.
 
 ### Others
 
-- 文档：CLAUDE.md 分层规范设施（根总览 + src 编码规范 + tests 测试规范）。
-- CI：push/PR 门禁 + tag 触发 npm 自动发布（OIDC 可信发布）。
-- 测试：边界用例补全与 dogfooding 流程（`pnpm dogfood`）。
-- 仓库治理：`.claude` 整体纳入 gitignore。
+- Docs: layered CLAUDE.md specs (root overview + src coding conventions + tests conventions).
+- CI: push/PR gates + tag-triggered npm auto-publish (OIDC trusted publishing).
+- Tests: edge-case coverage and dogfooding flow (`pnpm dogfood`).
+- Repo governance: `.claude` fully gitignored.

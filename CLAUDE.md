@@ -26,6 +26,10 @@ pnpm pack:check    # 发布内容预览（pack --dry-run）
 
 TypeScript（strict+）+ pnpm + commander + tsup + vitest + ESLint + Prettier。语言选型理由（未来 dsh 集成零摩擦）见 `README.md` Status。
 
+## 文档规范
+
+- CHANGELOG.md 以英文维护：版本条目用英文撰写（repo 面向国际用户）。
+
 <!-- claude-mem-lite:begin v1 -->
 ## claude-mem-lite — persistent memory
 
