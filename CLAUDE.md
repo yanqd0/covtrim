@@ -1,12 +1,20 @@
-# covtrim
+# CLAUDE.md: covtrim 项目导航
 
-Token 高效覆盖率压缩工具：读取标准 **lcov** → 输出紧凑 TSV，供 LLM/agent 消费（省约一半 token）。0.1.0 已提供 `covtrim <lcov>` 核心命令。
+> 本文档是**编程 AI 的项目导航**：给出定位、硬约束与"去哪找权威信息"的指引。编码规范见 `src/CLAUDE.md`；测试规范见 `tests/CLAUDE.md`。
 
-## 目录
+## 项目定位
 
-- `src/`    CLI 与核心逻辑（**编码规范** → `src/CLAUDE.md`）
-- `tests/`  测试（**测试规范** → `tests/CLAUDE.md`）
-- `dist/`   构建产物（tsup 输出，gitignore）
+Token 高效覆盖率压缩工具：读取标准 **lcov** → 输出紧凑 TSV 摘要（未覆盖降序），供 LLM/agent 消费，省约一半 token。TypeScript CLI（commander + tsup），核心命令 `covtrim <lcov>`（0.1.0 已就绪）。
+
+## 硬约束
+
+- **命令名 `covtrim`**；npm 双名发布：npmjs `covtrim` + GitHub Packages `@yanqd0/covtrim`（发布时临时改 name，见 `docs/RELEASING.md`）。
+- **engines `node >=20`**；CI 测试/发布统一 node 22（action 用 v5+，node24 runtime）。
+- **发布流程**：tag push 触发 `publish-npm.yml`（gate→test→publish→publish-github→release）；tag 与 package.json 版本一致。
+- **CHANGELOG 全英文**：`CHANGELOG.md` 版本段与条目一律英文。
+- **小步快跑、小提交**：每个逻辑变更独立 commit（Angular 前缀 `feat`/`fix`/`docs`/`chore`/`ci`）。
+- **dogfooding**：用 covtrim 压缩自身覆盖率（`pnpm dogfood`）验证价值。
+- **输出语言**：CLI 输出英文；代码注释中文、标识符英文。
 
 ## 常用命令
 
@@ -18,32 +26,18 @@ pnpm test:coverage # 覆盖率（含 lcov 报告）
 pnpm dogfood       # dogfooding：covtrim 压缩自身覆盖率 lcov
 pnpm lint          # ESLint
 pnpm check-types   # tsc --noEmit
-pnpm format        # Prettier
-pnpm pack:check    # 发布内容预览（pack --dry-run）
 ```
 
-## 技术栈
+## 文档导航
 
-TypeScript（strict+）+ pnpm + commander + tsup + vitest + ESLint + Prettier。语言选型理由（未来 dsh 集成零摩擦）见 `README.md` Status。
+- **`notes/` 是项目记忆目录**：文档化记忆（决策/规范/路线）放 notes/，索引见 `notes/MEMORY.md`。
+- **`docs/RELEASING.md`**：发布流程。
+- **`src/CLAUDE.md`**：TypeScript 编码规范。
+- **`tests/CLAUDE.md`**：vitest 测试规范。
 
-## 文档规范
+## 记忆约定
 
-- CHANGELOG.md 以英文维护：版本条目用英文撰写（repo 面向国际用户）。
-
-<!-- claude-mem-lite:begin v1 -->
-## claude-mem-lite — persistent memory
-
-PreToolUse hooks already run `mem_recall` for past lessons before Read/Edit/Write. The calls worth making proactively:
-
-| When | Call |
-|------|------|
-| Before Edit/Write | hook already recalled; if a `#NN` lesson was injected, cite `#NN` next time you produce user-visible text (citing = adopting the feedback; uncited lessons decay) |
-| After fixing a non-trivial bug | `mem_save(type="bugfix", lesson_learned="<root cause + fix>", importance=2)` |
-| After a non-obvious architecture decision | `mem_save(type="decision", lesson_learned="<constraint + tradeoff>")` |
-| Deferring to a future session | `mem_defer({title, priority:1|2|3, detail})`; when fixed, add `closes_deferred=[N]` to `mem_save` |
-| Looking up past work / history | `mem_search "keywords"` · `mem_recent` · `mem_timeline` |
-
-Path cost is round-trips, not milliseconds: the PreToolUse hook above already recalls (0 calls) — prefer it. For an explicit query, if these `mem_*` tools are deferred behind ToolSearch this session, the Bash CLI (exact path in the detail doc) is one call vs two (ToolSearch + call).
-
-Full tool + CLI tables, citation/decay rules, and save discipline → `.claude/plugin_claude_mem_lite.md`
-<!-- claude-mem-lite:end -->
+- 项目记忆由 **mem-lite** 管理（自动捕获 + 显式保存）。
+- 重要决策 / bug 修复 → `mem_save`（`type=decision`/`bugfix`，附 `lesson_learned`）。
+- 修改文件前 `mem_recall` 查历史；遗留事项 `mem_defer`（下次会话 SessionStart 展示）。
+- 适合固化的文档化记忆写 `notes/`，与 mem-lite 运行中记忆分工。
