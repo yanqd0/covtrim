@@ -1,5 +1,8 @@
 # covtrim
 
+[![npm](https://img.shields.io/npm/v/covtrim.svg)](https://www.npmjs.com/package/covtrim)
+[![CI](https://github.com/yanqd0/covtrim/actions/workflows/ci.yml/badge.svg)](https://github.com/yanqd0/covtrim/actions)
+
 Token-efficient coverage report compressor for LLM/agent consumption.
 Reads the standard **lcov** format and outputs a compact TSV summary — the same information in roughly half the tokens.
 
@@ -7,19 +10,19 @@ Reads the standard **lcov** format and outputs a compact TSV summary — the sam
 
 ```bash
 npm install -g covtrim
-# or 从 GitHub Packages 安装（scope 路由到 GitHub registry，避免依赖拉取失败）
+# or from GitHub Packages (scoped registry to avoid dependency fetch failures)
 npm config set @yanqd0:registry https://npm.pkg.github.com && npm install -g @yanqd0/covtrim
-# 或免安装直接运行
+# or run without installing
 npx covtrim <args>
 ```
 
 ## Usage
 
 ```bash
-covtrim <lcovFile>           # 压缩 lcov → 未覆盖降序 TSV 摘要
-covtrim <lcovFile> --tokens  # 附带 token 量化统计（写 stderr，默认关闭）
-covtrim --version            # 版本号
-covtrim --help               # 帮助
+covtrim <lcovFile>           # compress lcov → TSV summary sorted by uncovered lines
+covtrim <lcovFile> --tokens  # include token-quantification stats (stderr, off by default)
+covtrim --version            # print version
+covtrim --help               # show help
 ```
 
 ## Why
@@ -37,24 +40,9 @@ covtrim --help               # 帮助
 - `--summary`: one-line digest for LLM context ("12 modules, 3 below 90%, needs X")
 - Adapters: `llvm-cov` first; `pytest-cov` and more next (lcov core is language-agnostic)
 
-## Development
-
-```bash
-pnpm install         # 安装依赖
-pnpm dev             # 开发运行（tsx）
-pnpm test            # 测试（vitest）
-pnpm test:coverage   # 覆盖率（v8 → coverage/lcov.info）
-pnpm dogfood         # dogfooding：covtrim 压缩自身覆盖率 lcov
-pnpm lint            # ESLint
-pnpm check-types     # tsc --noEmit
-pnpm build           # 构建 → dist/
-```
-
-**Dogfooding**：`pnpm dogfood` 先跑 vitest 覆盖率（生成 `coverage/lcov.info`），再用 covtrim 压缩自身 lcov 输出为 TSV——直接验证 covtrim 对真实 lcov 的价值。当前自身 3 个源文件：token 从 607 降到 23（**-96%**）。
-
 ## Status
 
-0.1.0 in development, **TypeScript** (2026-08-26 decision). The language choice was driven by future integration with [dsh](https://github.com/deepseek-ai/deepseek-harness) (`@deepseek-ai/dsh`): its plugin ecosystem is npm packages installed via pnpm, and TypeScript is the zero-friction path. Roadmap: 0.2.0 adds multi-language coverage.
+Active development — see the [CHANGELOG](CHANGELOG.md) for the latest release.
 
 ## License
 
