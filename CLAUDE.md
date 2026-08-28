@@ -11,10 +11,10 @@ Token 高效覆盖率压缩工具：读取标准 **lcov** → 输出紧凑 TSV �
 - **命令名 `covtrim`**；npm 双名发布：npmjs `covtrim` + GitHub Packages `@yanqd0/covtrim`（发布时临时改 name，见 `docs/RELEASING.md`）。
 - **engines `node >=20`**；CI 测试/发布统一 node 22（action 用 v5+，node24 runtime）。
 - **发布流程**：tag push 触发 `publish-npm.yml`（gate→test→publish→publish-github→release）；tag 与 package.json 版本一致。
-- **CHANGELOG 全英文**：`CHANGELOG.md` 版本段与条目一律英文。
 - **小步快跑、小提交**：每个逻辑变更独立 commit（Angular 前缀 `feat`/`fix`/`docs`/`chore`/`ci`）。
 - **dogfooding**：用 covtrim 压缩自身覆盖率（`pnpm dogfood`）验证价值。
-- **输出语言**：CLI 输出英文；代码注释中文、标识符英文。
+- **文档分工（文件作用）**：README=对外推广/使用（用户）；CONTRIBUTING=对外开发须知（人类贡献者）；CLAUDE.md=对内 AI 导航；notes/=对内文档化记忆。新文档先定读者，再定放哪。
+- **语言约束**：对外默认文件英文（README / CONTRIBUTING / CHANGELOG / LICENSE / docs/）；对内默认中文（CLAUDE.md / notes/ / 代码注释）；CLI 输出英文、标识符英文。
 
 ## 常用命令
 
