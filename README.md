@@ -7,6 +7,8 @@ Reads the standard **lcov** format and outputs a compact TSV summary — the sam
 
 ```bash
 npm install -g covtrim
+# or 从 GitHub Packages 安装（scope 路由到 GitHub registry，避免依赖拉取失败）
+npm config set @yanqd0:registry https://npm.pkg.github.com && npm install -g @yanqd0/covtrim
 # 或免安装直接运行
 npx covtrim <args>
 ```
