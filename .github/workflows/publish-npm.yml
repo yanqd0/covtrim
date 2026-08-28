@@ -52,7 +52,8 @@ jobs:
     if: needs.gate.outputs.is_stable == 'true'
     runs-on: ubuntu-latest
     permissions:
-      id-token: write # OIDC 可信发布（仅 publish job 需要）
+      id-token: write # OIDC 可信发布
+      contents: read  # checkout 需要；job 级 permissions 覆盖后未列项为 none
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
