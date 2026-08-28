@@ -46,14 +46,6 @@ export function main(argv: string[], io: CliIo = defaultIo): number {
     .version(pkg.version);
 
   program
-    .command('hello')
-    .description('Print a greeting')
-    .action(() => {
-      io.stdout('Hello from covtrim!');
-      throw new CLIExit(0);
-    });
-
-  program
     .argument('<lcovFile>', 'lcov coverage file to summarize')
     .option('--tokens', 'print token usage stats to stderr')
     .description('Compress an lcov report into a compact TSV summary')

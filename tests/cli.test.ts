@@ -12,12 +12,6 @@ function run(argv: string[]): { code: number; out: string[]; err: string[] } {
 }
 
 describe('covtrim CLI', () => {
-  it('prints a greeting for the hello command', () => {
-    const { code, out } = run(['hello']);
-    expect(code).toBe(0);
-    expect(out.join('\n')).toContain('Hello from covtrim');
-  });
-
   it('reports the version', () => {
     const { out } = run(['--version']);
     expect(out.join('\n')).toMatch(/\d+\.\d+\.\d+/);
