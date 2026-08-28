@@ -2,6 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/covtrim.svg)](https://www.npmjs.com/package/covtrim)
 [![CI](https://github.com/yanqd0/covtrim/actions/workflows/ci.yml/badge.svg)](https://github.com/yanqd0/covtrim/actions)
+[![codecov](https://codecov.io/gh/yanqd0/covtrim/graph/badge.svg)](https://codecov.io/gh/yanqd0/covtrim)
 
 Token-efficient coverage report compressor for LLM/agent consumption.
 Reads the standard **lcov** format and outputs a compact TSV summary — the same information in roughly half the tokens.
