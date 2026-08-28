@@ -1,5 +1,15 @@
 # Change Log
 
+## 0.1.1
+
+### Others
+
+- Remove the scaffold `hello` command; `covtrim <lcovFile>` is now the only entry.
+- CI: upgrade `actions/checkout` & `actions/setup-node` to v5 (node24 runtime), dropping the Node 20 deprecation warning.
+- CI: publish to GitHub Packages as `@yanqd0/covtrim` and auto-create a GitHub Release (notes extracted from CHANGELOG).
+- Docs: switch CHANGELOG to English; rewrite CLAUDE.md as a concise project navigation; add `notes/MEMORY.md`.
+- Docs: document dual-name install (`covtrim` / `@yanqd0/covtrim`) in README.
+
 ## 0.1.0
 
 ### Features
