@@ -23,6 +23,8 @@ pnpm install
 | `pnpm test` | Run tests (vitest) |
 | `pnpm test:coverage` | Run tests with coverage (v8 → `coverage/lcov.info`) |
 | `pnpm dogfood` | Compress our own coverage lcov with covtrim (see Dogfooding) |
+| `pnpm test:integration:node` | Real node frameworks on the demo fixture (vitest/jest/c8/mocha/bun) |
+| `pnpm test:integration:rust` | Real `cargo llvm-cov` on the rust-demo fixture |
 | `pnpm lint` | ESLint |
 | `pnpm check-types` | `tsc --noEmit` |
 | `pnpm build` | Build → `dist/` |
@@ -64,3 +66,16 @@ covtrim ships to **npm** (as `covtrim`) and **GitHub Packages** (as `@yanqd0/cov
 ## Dogfooding
 
 `pnpm dogfood` runs vitest coverage (generating `coverage/lcov.info`), then compresses that lcov with covtrim itself — validating the tool against real lcov output. On the current 3 source files, token count drops from 607 to 23 (**−96%**).
+
+## Integration tests (multi-language)
+
+`covtrim node` / `covtrim rust` wrap real toolchains, so the integration suites (`tests/integration-*.itest.ts`) spawn them for real rather than mocking. They need a local multi-language environment.
+
+**Local — default on.** Requires the toolchains themselves:
+
+- Node: demo deps installed once via `pnpm install` in `tests/fixtures/projects/node-demo` (all frameworks live in that one `package.json`).
+- Rust: `cargo` + `cargo-llvm-cov` (`cargo install cargo-llvm-cov`) + `rustup component add llvm-tools-preview`.
+
+Run `pnpm test:integration:node` and `pnpm test:integration:rust`. A missing single framework is auto-skipped; the rest still run.
+
+**CI — default off.** GitHub Actions sets `CI=true`, so the suites auto-skip (CI has no Rust/Python toolchains). To override in any environment: `COVTRIM_RUN_INTEGRATION=1` forces them on, `COVTRIM_SKIP_INTEGRATION=1` forces them off.
