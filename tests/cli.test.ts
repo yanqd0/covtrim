@@ -55,10 +55,10 @@ describe('covtrim CLI', () => {
       expect(err.join('\n')).toContain('cannot read');
     });
 
-    it('exits 1 when no records are found', () => {
+    it('exits 1 for unsupported format (non-lcov input)', () => {
       const { code, err } = run(['package.json']);
       expect(code).toBe(1);
-      expect(err.join('\n')).toContain('no coverage records');
+      expect(err.join('\n')).toContain('unsupported format');
     });
 
     it('processes an edge-case lcov file', () => {
@@ -72,10 +72,10 @@ describe('covtrim CLI', () => {
       expect(files).toEqual(['dup.ts', 'dup.ts', 'zero.ts']);
     });
 
-    it('exits 1 for an empty file', () => {
+    it('exits 1 for an empty file (unsupported format)', () => {
       const { code, err } = run(['fixtures/empty.info']);
       expect(code).toBe(1);
-      expect(err.join('\n')).toContain('no coverage records');
+      expect(err.join('\n')).toContain('unsupported format');
     });
   });
 });

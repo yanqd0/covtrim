@@ -3,6 +3,7 @@ import { Command, CommanderError } from 'commander';
 import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import pkg from '../package.json' with { type: 'json' };
+import { detectFormat } from './detect.ts';
 import { parseLcov } from './lcov.ts';
 import { toTsv, tokenStats } from './tsv.ts';
 
@@ -82,6 +83,10 @@ function runReport(lcovFile: string, io: CliIo, showTokens: boolean): number {
     text = readFileSync(lcovFile, 'utf8');
   } catch (err) {
     io.stderr(`covtrim: cannot read ${lcovFile}: ${(err as Error).message}`);
+    return 1;
+  }
+  if (detectFormat(text) === 'unknown') {
+    io.stderr(`covtrim: unsupported format in ${lcovFile} (supported: lcov)`);
     return 1;
   }
   const records = parseLcov(text);
