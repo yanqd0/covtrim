@@ -103,6 +103,16 @@ function runDenoIn(
 }
 
 const okSpawn: SpawnFn = () => ({ status: 0, stderr: '' });
+
+/** mock spawn：模拟工具写出 coverage/lcov.info 后成功（配合新鲜度校验）。 */
+function fileSpawn(lcov: string): SpawnFn {
+  return (_cmd, opts) => {
+    mkdirSync(`${opts.cwd}/coverage`, { recursive: true });
+    writeFileSync(`${opts.cwd}/coverage/lcov.info`, lcov);
+    return { status: 0, stderr: '' };
+  };
+}
+
 const NODE_LCOV = 'SF:src/math.js\nLF:4\nLH:3\nend_of_record\n';
 const RUST_LCOV = 'SF:src/lib.rs\nLF:5\nLH:3\nend_of_record\n';
 const PY_LCOV = 'SF:src/math.py\nLF:4\nLH:2\nend_of_record\n';
@@ -182,7 +192,7 @@ describe('covtrim CLI', () => {
         'package.json': '{"devDependencies":{"vitest":"^3"}}',
         'coverage/lcov.info': NODE_LCOV,
       });
-      const { code, out } = runNodeIn(dir, [], okSpawn);
+      const { code, out } = runNodeIn(dir, [], fileSpawn(NODE_LCOV));
       expect(code).toBe(0);
       expect(out.join('\n')).toBe('file\tuncovered\ttotal\tpct\nsrc/math.js\t1\t4\t75.0');
       rmSync(dir, { recursive: true, force: true });
@@ -190,7 +200,7 @@ describe('covtrim CLI', () => {
 
     it('respects --framework override', () => {
       const dir = makeProj({ 'package.json': '{}', 'coverage/lcov.info': NODE_LCOV });
-      const { code, out } = runNodeIn(dir, ['--framework', 'jest'], okSpawn);
+      const { code, out } = runNodeIn(dir, ['--framework', 'jest'], fileSpawn(NODE_LCOV));
       expect(code).toBe(0);
       expect(out.join('\n')).toContain('src/math.js');
       rmSync(dir, { recursive: true, force: true });
@@ -248,7 +258,7 @@ describe('covtrim CLI', () => {
         'package.json': '{"devDependencies":{"vitest":"^3"}}',
         'coverage/lcov.info': NODE_LCOV,
       });
-      const { code, err } = runNodeIn(dir, ['--tokens'], okSpawn);
+      const { code, err } = runNodeIn(dir, ['--tokens'], fileSpawn(NODE_LCOV));
       expect(code).toBe(0);
       // 小输入下输出可能更大，符号可为 + 或 -（同 #644 教训）
       expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \([+-]\d+%\)/);
@@ -301,11 +311,9 @@ describe('covtrim CLI', () => {
   });
 
   describe('python command', () => {
-    const pyOk: SpawnFn = () => ({ status: 0, stderr: '' });
-
     it('runs pytest-cov and prints TSV from coverage/lcov.info', () => {
       const dir = makeProj({ 'package.json': '{}', 'coverage/lcov.info': PY_LCOV });
-      const { code, out } = runPythonIn(dir, [], pyOk);
+      const { code, out } = runPythonIn(dir, [], fileSpawn(PY_LCOV));
       expect(code).toBe(0);
       expect(out.join('\n')).toBe('file\tuncovered\ttotal\tpct\nsrc/math.py\t2\t4\t50.0');
       rmSync(dir, { recursive: true, force: true });
@@ -313,7 +321,7 @@ describe('covtrim CLI', () => {
 
     it('prints token stats with --tokens', () => {
       const dir = makeProj({ 'package.json': '{}', 'coverage/lcov.info': PY_LCOV });
-      const { code, err } = runPythonIn(dir, ['--tokens'], pyOk);
+      const { code, err } = runPythonIn(dir, ['--tokens'], fileSpawn(PY_LCOV));
       expect(code).toBe(0);
       expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \([+-]\d+%\)/);
       rmSync(dir, { recursive: true, force: true });

@@ -31,6 +31,8 @@ covtrim --version            # print version
 covtrim --help               # show help
 ```
 
+> ⚠️ `covtrim node|rust|python|deno` runs the project's test/coverage commands, which **executes that project's code**. Only run them on repositories you trust; covtrim prints the commands it will run to stderr first.
+
 ## Why
 
 - LLMs read coverage tables poorly: they mix hundreds of `test ... ok` log lines with the actual table, and general-purpose token optimizers (e.g. RTK) treat the table itself as noise and drop it.

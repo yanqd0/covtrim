@@ -175,16 +175,23 @@ function runReport(lcovFile: string, io: CliIo, showTokens: boolean): number {
     io.stderr(`covtrim: unsupported format in ${lcovFile} (supported: lcov)`);
     return 1;
   }
-  const records = parseLcov(text);
+  return emitReport(text, io, showTokens, `covtrim: no coverage records found in ${lcovFile}`);
+}
+
+/** 统一输出：parseLcov → 空检查 → TSV → 可选 token 统计（runReport 与各语言命令共用）。 */
+function emitReport(lcovText: string, io: CliIo, showTokens: boolean, emptyMsg: string): number {
+  const records = parseLcov(lcovText);
   if (records.length === 0) {
-    io.stderr(`covtrim: no coverage records found in ${lcovFile}`);
+    io.stderr(emptyMsg);
     return 1;
   }
   const tsv = toTsv(records);
   io.stdout(tsv);
   if (showTokens) {
-    const stats = tokenStats(text, tsv);
-    io.stderr(`tokens: ${stats.inputTokens} → ${stats.outputTokens} (${stats.savedPct >= 0 ? '-' : '+'}${Math.abs(stats.savedPct)}%)`);
+    const stats = tokenStats(lcovText, tsv);
+    io.stderr(
+      `tokens: ${stats.inputTokens} → ${stats.outputTokens} (${stats.savedPct >= 0 ? '-' : '+'}${Math.abs(stats.savedPct)}%)`
+    );
   }
   return 0;
 }
@@ -220,25 +227,13 @@ function runNodeCommand(
       return 1;
     }
   }
+  io.stderr(`covtrim: will run test/coverage commands in ${cwd} (executes project code)`);
   const result = runNodeFramework(spec, args, cwd, spawn);
   if (!result.ok) {
     io.stderr(result.message);
     return 1;
   }
-  const records = parseLcov(result.lcov);
-  if (records.length === 0) {
-    io.stderr('covtrim: no coverage records found in coverage/lcov.info');
-    return 1;
-  }
-  const tsv = toTsv(records);
-  io.stdout(tsv);
-  if (showTokens) {
-    const stats = tokenStats(result.lcov, tsv);
-    io.stderr(
-      `tokens: ${stats.inputTokens} → ${stats.outputTokens} (${stats.savedPct >= 0 ? '-' : '+'}${Math.abs(stats.savedPct)}%)`
-    );
-  }
-  return 0;
+  return emitReport(result.lcov, io, showTokens, 'covtrim: no coverage records found in coverage/lcov.info');
 }
 
 /**
@@ -254,25 +249,13 @@ function runRustCommand(
   showTokens: boolean,
   spawn?: SpawnFn
 ): number {
+  io.stderr(`covtrim: will run test/coverage commands in ${cwd} (executes project code)`);
   const result = runRust(args, cwd, spawn);
   if (!result.ok) {
     io.stderr(result.message);
     return 1;
   }
-  const records = parseLcov(result.lcov);
-  if (records.length === 0) {
-    io.stderr('covtrim: no coverage records found in lcov output');
-    return 1;
-  }
-  const tsv = toTsv(records);
-  io.stdout(tsv);
-  if (showTokens) {
-    const stats = tokenStats(result.lcov, tsv);
-    io.stderr(
-      `tokens: ${stats.inputTokens} → ${stats.outputTokens} (${stats.savedPct >= 0 ? '-' : '+'}${Math.abs(stats.savedPct)}%)`
-    );
-  }
-  return 0;
+  return emitReport(result.lcov, io, showTokens, 'covtrim: no coverage records found in lcov output');
 }
 
 /**
@@ -288,25 +271,13 @@ function runPythonCommand(
   showTokens: boolean,
   spawn?: SpawnFn
 ): number {
+  io.stderr(`covtrim: will run test/coverage commands in ${cwd} (executes project code)`);
   const result = runPython(args, cwd, spawn);
   if (!result.ok) {
     io.stderr(result.message);
     return 1;
   }
-  const records = parseLcov(result.lcov);
-  if (records.length === 0) {
-    io.stderr('covtrim: no coverage records found in coverage/lcov.info');
-    return 1;
-  }
-  const tsv = toTsv(records);
-  io.stdout(tsv);
-  if (showTokens) {
-    const stats = tokenStats(result.lcov, tsv);
-    io.stderr(
-      `tokens: ${stats.inputTokens} → ${stats.outputTokens} (${stats.savedPct >= 0 ? '-' : '+'}${Math.abs(stats.savedPct)}%)`
-    );
-  }
-  return 0;
+  return emitReport(result.lcov, io, showTokens, 'covtrim: no coverage records found in coverage/lcov.info');
 }
 
 /**
@@ -322,25 +293,13 @@ function runDenoCommand(
   showTokens: boolean,
   spawn?: SpawnFn
 ): number {
+  io.stderr(`covtrim: will run test/coverage commands in ${cwd} (executes project code)`);
   const result = runDeno(args, cwd, spawn);
   if (!result.ok) {
     io.stderr(result.message);
     return 1;
   }
-  const records = parseLcov(result.lcov);
-  if (records.length === 0) {
-    io.stderr('covtrim: no coverage records found in lcov output');
-    return 1;
-  }
-  const tsv = toTsv(records);
-  io.stdout(tsv);
-  if (showTokens) {
-    const stats = tokenStats(result.lcov, tsv);
-    io.stderr(
-      `tokens: ${stats.inputTokens} → ${stats.outputTokens} (${stats.savedPct >= 0 ? '-' : '+'}${Math.abs(stats.savedPct)}%)`
-    );
-  }
-  return 0;
+  return emitReport(result.lcov, io, showTokens, 'covtrim: no coverage records found in lcov output');
 }
 
 // 直接以 bin 运行时执行（经 symlink 安装时 realpath 后仍命中）；被 import（测试）时不触发。
