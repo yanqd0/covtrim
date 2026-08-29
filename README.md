@@ -26,6 +26,7 @@ covtrim node [args]          # run Node tests (auto-detected framework) → TSV
 covtrim node --framework vitest  # pick the test framework explicitly
 covtrim rust [args]          # run Rust tests via cargo llvm-cov → TSV
 covtrim python [args]        # run Python tests via pytest-cov → TSV
+covtrim deno [args]          # run Deno tests with coverage → TSV
 covtrim --version            # print version
 covtrim --help               # show help
 ```
@@ -43,7 +44,7 @@ covtrim --help               # show help
 - `--diff`: baseline regression detection (improved / regressed / newly-uncovered)
 - `--fail-under <N>`: CI gate with exit code
 - `--summary`: one-line digest for LLM context ("12 modules, 3 below 90%, needs X")
-- Adapters: ✅ `covtrim node` (vitest / jest / c8 / mocha+nyc / bun / node:test) — 0.2.0; ✅ `covtrim rust` (cargo llvm-cov); ✅ `covtrim python` (pytest-cov)
+- Adapters: ✅ `covtrim node` (vitest / jest / c8 / mocha+nyc / bun / node:test) — 0.2.0; ✅ `covtrim rust` (cargo llvm-cov); ✅ `covtrim python` (pytest-cov); ✅ `covtrim deno` (built-in coverage)
 
 ## Status
 

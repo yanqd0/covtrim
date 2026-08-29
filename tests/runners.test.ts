@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   detectNodeFramework,
   NODE_FRAMEWORKS,
+  runDeno,
   runNodeFramework,
   runPython,
   runRust,
@@ -273,6 +274,74 @@ describe('runPython', () => {
     const dir = makeProject({ 'package.json': '{}', 'coverage/lcov.info': PY_LCOV });
     runPython(['-x'], dir, spy);
     expect(seen[0]).toEqual(['pytest', '--cov', '--cov-report=lcov:coverage/lcov.info', '-x']);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('runDeno', () => {
+  const DENO_LCOV = 'SF:src/math.ts\nLF:4\nLH:2\nend_of_record\n';
+  /** 两步 mock：deno test 步成功 → deno coverage 步输出 lcov。 */
+  const okDeno: SpawnFn = (cmd) =>
+    cmd[1] === 'test'
+      ? { status: 0, stdout: '', stderr: '' }
+      : { status: 0, stdout: DENO_LCOV, stderr: '' };
+
+  it('returns lcov from coverage stdout on success', () => {
+    const dir = makeProject({ 'package.json': '{}' });
+    expect(runDeno([], dir, okDeno)).toEqual({ ok: true, lcov: DENO_LCOV });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reports missing deno with install hint on spawn error', () => {
+    const missing: SpawnFn = () => ({
+      status: null,
+      stdout: '',
+      stderr: '',
+      error: new Error('ENOENT'),
+    });
+    const dir = makeProject({ 'package.json': '{}' });
+    const r = runDeno([], dir, missing);
+    expect(r).toMatchObject({ ok: false, reason: 'missing-deno' });
+    if (!r.ok) expect(r.message).toContain('https://deno.com');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('forwards stderr and exit code when deno test fails', () => {
+    const fail: SpawnFn = () => ({ status: 1, stdout: '', stderr: 'FAILED\n' });
+    const dir = makeProject({ 'package.json': '{}' });
+    const r = runDeno([], dir, fail);
+    expect(r).toMatchObject({ ok: false, reason: 'failed' });
+    if (!r.ok) {
+      expect(r.message).toContain('exit code 1');
+      expect(r.message).toContain('FAILED');
+    }
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reports no-lcov when coverage stdout has no lcov', () => {
+    const noLcov: SpawnFn = (cmd) =>
+      cmd[1] === 'test'
+        ? { status: 0, stdout: '', stderr: '' }
+        : { status: 0, stdout: 'nope', stderr: '' };
+    const dir = makeProject({ 'package.json': '{}' });
+    const r = runDeno([], dir, noLcov);
+    expect(r).toMatchObject({ ok: false, reason: 'no-lcov' });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('forwards args to deno test', () => {
+    const seen: string[][] = [];
+    const spy: SpawnFn = (cmd) => {
+      seen.push(cmd);
+      return cmd[1] === 'test'
+        ? { status: 0, stdout: '', stderr: '' }
+        : { status: 0, stdout: DENO_LCOV, stderr: '' };
+    };
+    const dir = makeProject({ 'package.json': '{}' });
+    runDeno(['--allow-read'], dir, spy);
+    expect(seen[0]).toEqual(
+      expect.arrayContaining(['deno', 'test', expect.stringContaining('--coverage='), '--allow-read'])
+    );
     rmSync(dir, { recursive: true, force: true });
   });
 });

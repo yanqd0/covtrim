@@ -83,10 +83,30 @@ function runPythonIn(
   return { code, out, err };
 }
 
+/** 在指定目录 + mock spawn 下运行 `covtrim deno`。 */
+function runDenoIn(
+  dir: string,
+  argv: string[],
+  spawn: SpawnFn
+): { code: number; out: string[]; err: string[] } {
+  const out: string[] = [];
+  const err: string[] = [];
+  const code = main(
+    ['node', 'covtrim', 'deno', ...argv],
+    {
+      stdout: (s) => out.push(s),
+      stderr: (s) => err.push(s),
+    },
+    { cwd: dir, spawn }
+  );
+  return { code, out, err };
+}
+
 const okSpawn: SpawnFn = () => ({ status: 0, stderr: '' });
 const NODE_LCOV = 'SF:src/math.js\nLF:4\nLH:3\nend_of_record\n';
 const RUST_LCOV = 'SF:src/lib.rs\nLF:5\nLH:3\nend_of_record\n';
 const PY_LCOV = 'SF:src/math.py\nLF:4\nLH:2\nend_of_record\n';
+const DENO_LCOV = 'SF:src/math.ts\nLF:4\nLH:2\nend_of_record\n';
 
 describe('covtrim CLI', () => {
   it('reports the version', () => {
@@ -320,6 +340,50 @@ describe('covtrim CLI', () => {
       expect(code).toBe(1);
       expect(err.join('\n')).toContain('exit code 1');
       expect(err.join('\n')).toContain('1 failed');
+      rmSync(dir, { recursive: true, force: true });
+    });
+  });
+
+  describe('deno command', () => {
+    const denoOk: SpawnFn = () => ({ status: 0, stdout: DENO_LCOV, stderr: '' });
+
+    it('runs deno test+coverage and prints TSV', () => {
+      const dir = makeProj({ 'package.json': '{}' });
+      const { code, out } = runDenoIn(dir, [], denoOk);
+      expect(code).toBe(0);
+      expect(out.join('\n')).toBe('file\tuncovered\ttotal\tpct\nsrc/math.ts\t2\t4\t50.0');
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('prints token stats with --tokens', () => {
+      const dir = makeProj({ 'package.json': '{}' });
+      const { code, err } = runDenoIn(dir, ['--tokens'], denoOk);
+      expect(code).toBe(0);
+      expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \([+-]\d+%\)/);
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('forwards missing-deno install hint', () => {
+      const dir = makeProj({ 'package.json': '{}' });
+      const missing: SpawnFn = () => ({
+        status: null,
+        stdout: '',
+        stderr: '',
+        error: new Error('ENOENT'),
+      });
+      const { code, err } = runDenoIn(dir, [], missing);
+      expect(code).toBe(1);
+      expect(err.join('\n')).toContain('https://deno.com');
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('forwards test failure stderr and exit code', () => {
+      const dir = makeProj({ 'package.json': '{}' });
+      const fail: SpawnFn = () => ({ status: 1, stdout: '', stderr: 'FAILED\n' });
+      const { code, err } = runDenoIn(dir, [], fail);
+      expect(code).toBe(1);
+      expect(err.join('\n')).toContain('exit code 1');
+      expect(err.join('\n')).toContain('FAILED');
       rmSync(dir, { recursive: true, force: true });
     });
   });
