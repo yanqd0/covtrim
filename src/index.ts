@@ -9,6 +9,7 @@ import {
   detectNodeFramework,
   NODE_FRAMEWORKS,
   runNodeFramework,
+  runRust,
   type NodeFrameworkSpec,
   type SpawnFn,
 } from './runners.ts';
@@ -80,6 +81,23 @@ export function main(argv: string[], io: CliIo = defaultIo, deps: MainDeps = {})
         deps.cwd ?? process.cwd(),
         args,
         opts.framework,
+        io,
+        rootOpts.tokens === true,
+        deps.spawn
+      );
+      if (code !== 0) throw new CLIExit(code);
+    });
+
+  program
+    .command('rust')
+    .description('Run Rust tests via cargo llvm-cov and compress coverage into TSV')
+    .argument('[args...]', 'arguments forwarded to cargo llvm-cov')
+    .action((args: string[]) => {
+      // --tokens 声明在根命令：读根 opts（同 node 子命令）
+      const rootOpts = program.opts();
+      const code = runRustCommand(
+        deps.cwd ?? process.cwd(),
+        args,
         io,
         rootOpts.tokens === true,
         deps.spawn
@@ -174,6 +192,40 @@ function runNodeCommand(
   const records = parseLcov(result.lcov);
   if (records.length === 0) {
     io.stderr('covtrim: no coverage records found in coverage/lcov.info');
+    return 1;
+  }
+  const tsv = toTsv(records);
+  io.stdout(tsv);
+  if (showTokens) {
+    const stats = tokenStats(result.lcov, tsv);
+    io.stderr(
+      `tokens: ${stats.inputTokens} → ${stats.outputTokens} (${stats.savedPct >= 0 ? '-' : '+'}${Math.abs(stats.savedPct)}%)`
+    );
+  }
+  return 0;
+}
+
+/**
+ * `covtrim rust`：运行 cargo llvm-cov → stdout lcov → 输出 TSV。
+ *
+ * @param cwd 项目目录（cargo 命令基准）
+ * @returns 退出码（0 成功，1 失败）
+ */
+function runRustCommand(
+  cwd: string,
+  args: string[],
+  io: CliIo,
+  showTokens: boolean,
+  spawn?: SpawnFn
+): number {
+  const result = runRust(args, cwd, spawn);
+  if (!result.ok) {
+    io.stderr(result.message);
+    return 1;
+  }
+  const records = parseLcov(result.lcov);
+  if (records.length === 0) {
+    io.stderr('covtrim: no coverage records found in lcov output');
     return 1;
   }
   const tsv = toTsv(records);

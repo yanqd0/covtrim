@@ -24,20 +24,21 @@ export interface PackageJson {
 /** spawn 结果抽象（便于测试注入 mock）。 */
 export interface SpawnResult {
   status: number | null;
+  stdout?: string;
   stderr: string;
   error?: Error;
 }
 export type SpawnFn = (cmd: string[], opts: { cwd: string }) => SpawnResult;
 
-/** 默认 spawn：同步执行命令并捕获输出。 */
+/** 默认 spawn：同步执行命令并捕获输出（含 stdout，rust 用）。 */
 export const defaultSpawn: SpawnFn = (cmd, opts) => {
   const [bin, ...rest] = cmd;
   if (bin === undefined) return { status: null, stderr: '', error: new Error('empty command') };
   const r = spawnSync(bin, rest, { cwd: opts.cwd, encoding: 'utf8' });
   // exactOptionalPropertyTypes：error 为 undefined 时省略该键，不显式赋值
   return r.error === undefined
-    ? { status: r.status, stderr: r.stderr ?? '' }
-    : { status: r.status, stderr: r.stderr ?? '', error: r.error };
+    ? { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' }
+    : { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '', error: r.error };
 };
 
 const hasDevDep = (pkg: PackageJson, name: string): boolean =>
@@ -167,6 +168,54 @@ export function runNodeFramework(
       ok: false,
       reason: 'no-lcov',
       message: `covtrim: ${cmd.join(' ')} produced no coverage/lcov.info`,
+    };
+  }
+  return { ok: true, lcov };
+}
+
+/** rust 子命令运行结果。 */
+export type RustRunResult =
+  | { ok: true; lcov: string }
+  | {
+      ok: false;
+      reason: 'missing-cargo' | 'missing-llvm-cov' | 'failed' | 'no-lcov';
+      message: string;
+    };
+
+/**
+ * 运行 `cargo llvm-cov --lcov [args]` 并取回 stdout lcov。
+ *
+ * 错误分层：spawn 失败（cargo 缺失）→ missing-cargo + rustup 提示；非 0 且 stderr 含 llvm-cov
+ * （插件未装）→ missing-llvm-cov + cargo install 提示；非 0 其他（测试失败）→ failed + stderr 尾部；
+ * 0 但 stdout 非 lcov → no-lcov。
+ */
+export function runRust(args: string[], dir: string, spawn: SpawnFn = defaultSpawn): RustRunResult {
+  const cmd = ['cargo', 'llvm-cov', '--lcov', ...args];
+  const r = spawn(cmd, { cwd: dir });
+  if (r.error) {
+    return {
+      ok: false,
+      reason: 'missing-cargo',
+      message: 'covtrim: cargo not found — Install Rust: https://rustup.rs',
+    };
+  }
+  if (r.status !== 0) {
+    const pluginMissing = r.stderr.includes('llvm-cov');
+    const hint = pluginMissing
+      ? '\ncovtrim: run `cargo install cargo-llvm-cov` (plugin missing)'
+      : '';
+    return {
+      ok: false,
+      reason: pluginMissing ? 'missing-llvm-cov' : 'failed',
+      message: `covtrim: ${cmd.join(' ')} failed with exit code ${r.status}\n${r.stderr.trimEnd()}${hint}`,
+    };
+  }
+  const lcov = r.stdout ?? '';
+  if (!lcov.includes('end_of_record')) {
+    return {
+      ok: false,
+      reason: 'no-lcov',
+      message: `covtrim: ${cmd.join(' ')} produced no lcov on stdout`,
     };
   }
   return { ok: true, lcov };
