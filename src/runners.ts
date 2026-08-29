@@ -220,3 +220,43 @@ export function runRust(args: string[], dir: string, spawn: SpawnFn = defaultSpa
   }
   return { ok: true, lcov };
 }
+
+/** python 子命令运行结果。 */
+export type PythonRunResult =
+  | { ok: true; lcov: string }
+  | { ok: false; reason: 'missing-pytest' | 'failed' | 'no-lcov'; message: string };
+
+/**
+ * 运行 `pytest --cov --cov-report=lcov:coverage/lcov.info [args]` 并读回 lcov 文件。
+ *
+ * 与 rust 不同：pytest-cov 的 lcov 报告器只写文件（不支持 stdout），故固定写到 coverage/lcov.info 再读。
+ * 错误分层：spawn 失败（pytest 缺失）→ missing-pytest + pip 提示；非 0（测试失败）→ failed + stderr 尾部；
+ * 0 但无 coverage/lcov.info → no-lcov。
+ */
+export function runPython(args: string[], dir: string, spawn: SpawnFn = defaultSpawn): PythonRunResult {
+  const cmd = ['pytest', '--cov', '--cov-report=lcov:coverage/lcov.info', ...args];
+  const r = spawn(cmd, { cwd: dir });
+  if (r.error) {
+    return {
+      ok: false,
+      reason: 'missing-pytest',
+      message: 'covtrim: pytest not found — pip install pytest pytest-cov (or: uv pip install pytest pytest-cov)',
+    };
+  }
+  if (r.status !== 0) {
+    return {
+      ok: false,
+      reason: 'failed',
+      message: `covtrim: ${cmd.join(' ')} failed with exit code ${r.status}\n${r.stderr.trimEnd()}`,
+    };
+  }
+  const lcov = readLcov(dir);
+  if (lcov === null) {
+    return {
+      ok: false,
+      reason: 'no-lcov',
+      message: `covtrim: ${cmd.join(' ')} produced no coverage/lcov.info`,
+    };
+  }
+  return { ok: true, lcov };
+}

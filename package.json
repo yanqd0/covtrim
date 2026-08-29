@@ -32,6 +32,7 @@
     "test:coverage": "vitest run --coverage",
     "test:integration:node": "vitest run --config vitest.integration.config.ts tests/integration-node.itest.ts",
     "test:integration:rust": "vitest run --config vitest.integration.config.ts tests/integration-rust.itest.ts",
+    "test:integration:python": "vitest run --config vitest.integration.config.ts tests/integration-python.itest.ts",
     "dogfood": "pnpm test:coverage && tsx src/index.ts --tokens coverage/lcov.info",
     "lint": "eslint src tests",
     "format": "prettier --write .",

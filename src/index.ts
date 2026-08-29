@@ -9,6 +9,7 @@ import {
   detectNodeFramework,
   NODE_FRAMEWORKS,
   runNodeFramework,
+  runPython,
   runRust,
   type NodeFrameworkSpec,
   type SpawnFn,
@@ -96,6 +97,23 @@ export function main(argv: string[], io: CliIo = defaultIo, deps: MainDeps = {})
       // --tokens 声明在根命令：读根 opts（同 node 子命令）
       const rootOpts = program.opts();
       const code = runRustCommand(
+        deps.cwd ?? process.cwd(),
+        args,
+        io,
+        rootOpts.tokens === true,
+        deps.spawn
+      );
+      if (code !== 0) throw new CLIExit(code);
+    });
+
+  program
+    .command('python')
+    .description('Run Python tests via pytest-cov and compress coverage into TSV')
+    .argument('[args...]', 'arguments forwarded to pytest')
+    .action((args: string[]) => {
+      // --tokens 声明在根命令：读根 opts（同 node/rust）
+      const rootOpts = program.opts();
+      const code = runPythonCommand(
         deps.cwd ?? process.cwd(),
         args,
         io,
@@ -226,6 +244,40 @@ function runRustCommand(
   const records = parseLcov(result.lcov);
   if (records.length === 0) {
     io.stderr('covtrim: no coverage records found in lcov output');
+    return 1;
+  }
+  const tsv = toTsv(records);
+  io.stdout(tsv);
+  if (showTokens) {
+    const stats = tokenStats(result.lcov, tsv);
+    io.stderr(
+      `tokens: ${stats.inputTokens} → ${stats.outputTokens} (${stats.savedPct >= 0 ? '-' : '+'}${Math.abs(stats.savedPct)}%)`
+    );
+  }
+  return 0;
+}
+
+/**
+ * `covtrim python`：运行 pytest-cov → 读 coverage/lcov.info → 输出 TSV。
+ *
+ * @param cwd 项目目录（pytest 命令基准）
+ * @returns 退出码（0 成功，1 失败）
+ */
+function runPythonCommand(
+  cwd: string,
+  args: string[],
+  io: CliIo,
+  showTokens: boolean,
+  spawn?: SpawnFn
+): number {
+  const result = runPython(args, cwd, spawn);
+  if (!result.ok) {
+    io.stderr(result.message);
+    return 1;
+  }
+  const records = parseLcov(result.lcov);
+  if (records.length === 0) {
+    io.stderr('covtrim: no coverage records found in coverage/lcov.info');
     return 1;
   }
   const tsv = toTsv(records);
