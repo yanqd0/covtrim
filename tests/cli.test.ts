@@ -174,5 +174,24 @@ describe('covtrim CLI', () => {
       expect(err.join('\n')).toContain('intentional');
       rmSync(dir, { recursive: true, force: true });
     });
+
+    it('reports no-lcov when the test passes without coverage output', () => {
+      const dir = makeProj({ 'package.json': '{"devDependencies":{"vitest":"^3"}}' });
+      const { code, err } = runNodeIn(dir, [], okSpawn);
+      expect(code).toBe(1);
+      expect(err.join('\n')).toContain('produced no coverage/lcov.info');
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('prints token stats with --tokens', () => {
+      const dir = makeProj({
+        'package.json': '{"devDependencies":{"vitest":"^3"}}',
+        'coverage/lcov.info': NODE_LCOV,
+      });
+      const { code, err } = runNodeIn(dir, ['--tokens'], okSpawn);
+      expect(code).toBe(0);
+      expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \(-\d+%\)/);
+      rmSync(dir, { recursive: true, force: true });
+    });
   });
 });
