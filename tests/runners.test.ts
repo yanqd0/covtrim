@@ -34,6 +34,13 @@ function makeProject(files: Record<string, string>): string {
 
 const okSpawn: SpawnFn = () => ({ status: 0, stderr: '' });
 
+/** mock spawn：模拟工具写出 coverage/lcov.info 后成功（配合新鲜度校验）。 */
+const fileOk = (lcov: string): SpawnFn => (_cmd, opts) => {
+  mkdirSync(`${opts.cwd}/coverage`, { recursive: true });
+  writeFileSync(`${opts.cwd}/coverage/lcov.info`, lcov);
+  return { status: 0, stderr: '' };
+};
+
 const LCOV = 'SF:a.ts\nLF:5\nLH:3\nend_of_record\n';
 
 describe('detectNodeFramework', () => {
@@ -61,9 +68,18 @@ describe('detectNodeFramework', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('detects bun from bun.lockb', () => {
-    const dir = makeProject({ 'package.json': '{}', 'bun.lockb': '' });
+  it('detects bun from a bun test script', () => {
+    const dir = makeProject({ 'package.json': '{"scripts":{"test":"bun test"}}' });
     expect(detectNodeFramework(dir)).toBe('bun');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('does not misdetect bun from bun.lockb alone (package manager)', () => {
+    const dir = makeProject({
+      'package.json': '{"scripts":{"test":"node --test"}}',
+      'bun.lockb': '',
+    });
+    expect(detectNodeFramework(dir)).toBe('node-test');
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -87,7 +103,7 @@ describe('runNodeFramework', () => {
       'package.json': '{"devDependencies":{"vitest":"^3"}}',
       'coverage/lcov.info': LCOV,
     });
-    expect(runNodeFramework(vitest, [], dir, okSpawn)).toEqual({ ok: true, lcov: LCOV });
+    expect(runNodeFramework(vitest, [], dir, fileOk(LCOV))).toEqual({ ok: true, lcov: LCOV });
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -224,7 +240,7 @@ describe('runPython', () => {
 
   it('returns lcov from coverage/lcov.info on success', () => {
     const dir = makeProject({ 'package.json': '{}', 'coverage/lcov.info': PY_LCOV });
-    expect(runPython([], dir, okPy)).toEqual({ ok: true, lcov: PY_LCOV });
+    expect(runPython([], dir, fileOk(PY_LCOV))).toEqual({ ok: true, lcov: PY_LCOV });
     rmSync(dir, { recursive: true, force: true });
   });
 

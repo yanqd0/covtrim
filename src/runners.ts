@@ -28,6 +28,7 @@ export interface SpawnResult {
   status: number | null;
   stdout?: string;
   stderr: string;
+  signal?: NodeJS.Signals | null;
   error?: Error;
 }
 export type SpawnFn = (cmd: string[], opts: { cwd: string }) => SpawnResult;
@@ -39,9 +40,23 @@ export const defaultSpawn: SpawnFn = (cmd, opts) => {
   const r = spawnSync(bin, rest, { cwd: opts.cwd, encoding: 'utf8' });
   // exactOptionalPropertyTypes：error 为 undefined 时省略该键，不显式赋值
   return r.error === undefined
-    ? { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' }
-    : { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '', error: r.error };
+    ? { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '', signal: r.signal }
+    : {
+        status: r.status,
+        stdout: r.stdout ?? '',
+        stderr: r.stderr ?? '',
+        signal: r.signal,
+        error: r.error,
+      };
 };
+
+/** 构造底层命令失败消息（区分被信号终止 / 普通退出码 / 未知状态）。 */
+function spawnFailure(cmd: string[], r: SpawnResult): string {
+  if (r.signal) {
+    return `covtrim: ${cmd.join(' ')} killed by signal ${r.signal}\n${r.stderr.trimEnd()}`;
+  }
+  return `covtrim: ${cmd.join(' ')} failed with exit code ${r.status ?? 'unknown'}\n${r.stderr.trimEnd()}`;
+}
 
 const hasDevDep = (pkg: PackageJson, name: string): boolean =>
   pkg.devDependencies?.[name] !== undefined;
@@ -70,7 +85,7 @@ export const NODE_FRAMEWORKS: NodeFrameworkSpec[] = [
     cmd: (args, pkg) =>
       scriptTest(pkg ?? {}).includes('c8')
         ? ['npm', 'test', ...args]
-        : ['c8', 'node', '--test', ...args],
+        : ['c8', '--reporter=lcovonly', 'node', '--test', ...args],
     installHint: 'npm i -D c8',
   },
   {
@@ -80,17 +95,18 @@ export const NODE_FRAMEWORKS: NodeFrameworkSpec[] = [
     installHint: 'npm i -D mocha nyc',
   },
   {
-    name: 'bun',
-    detect: (pkg, files) =>
-      files.includes('bun.lock') || files.includes('bun.lockb') || hasDevDep(pkg, 'bun'),
-    cmd: (args) => ['bun', 'test', '--coverage', '--coverage-reporter', 'lcov', ...args],
-    installHint: 'Install Bun: https://bun.sh',
-  },
-  {
     name: 'node-test',
     detect: (pkg) => /node --test/.test(scriptTest(pkg)),
-    cmd: (args) => ['c8', 'node', '--test', ...args],
+    cmd: (args) => ['c8', '--reporter=lcovonly', 'node', '--test', ...args],
     installHint: 'npm i -D c8',
+  },
+  {
+    // bun 检测弱化：仅脚本含 bun test 或存在 bunfig.toml（避免 bun 仅作包管理器时误伤），置于末位兜底
+    name: 'bun',
+    detect: (pkg, files) =>
+      /bun test/.test(scriptTest(pkg)) || files.includes('bunfig.toml'),
+    cmd: (args) => ['bun', 'test', '--coverage', '--coverage-reporter', 'lcov', ...args],
+    installHint: 'Install Bun: https://bun.sh',
   },
 ];
 
@@ -149,6 +165,8 @@ export function runNodeFramework(
 ): NodeRunResult {
   const pkg = readPackage(dir);
   const cmd = fw.cmd(args, pkg ?? undefined);
+  // spawn 前删残留 lcov：防止工具退出 0 却未重新生成时读到陈旧文件（审查 MEDIUM-2）
+  rmSync(`${dir}/coverage/lcov.info`, { force: true });
   const r = spawn(cmd, { cwd: dir });
   if (r.error) {
     return {
@@ -158,11 +176,7 @@ export function runNodeFramework(
     };
   }
   if (r.status !== 0) {
-    return {
-      ok: false,
-      reason: 'failed',
-      message: `covtrim: ${cmd.join(' ')} failed with exit code ${r.status}\n${r.stderr.trimEnd()}`,
-    };
+    return { ok: false, reason: 'failed', message: spawnFailure(cmd, r) };
   }
   const lcov = readLcov(dir);
   if (lcov === null) {
@@ -209,7 +223,7 @@ export function runRust(args: string[], dir: string, spawn: SpawnFn = defaultSpa
     return {
       ok: false,
       reason: pluginMissing ? 'missing-llvm-cov' : 'failed',
-      message: `covtrim: ${cmd.join(' ')} failed with exit code ${r.status}\n${r.stderr.trimEnd()}${hint}`,
+      message: `${spawnFailure(cmd, r)}${hint}`,
     };
   }
   const lcov = r.stdout ?? '';
@@ -237,6 +251,8 @@ export type PythonRunResult =
  */
 export function runPython(args: string[], dir: string, spawn: SpawnFn = defaultSpawn): PythonRunResult {
   const cmd = ['pytest', '--cov', '--cov-report=lcov:coverage/lcov.info', ...args];
+  // spawn 前删残留 lcov：防止退出 0 却未重新生成时读到陈旧文件（审查 MEDIUM-2）
+  rmSync(`${dir}/coverage/lcov.info`, { force: true });
   const r = spawn(cmd, { cwd: dir });
   if (r.error) {
     return {
@@ -246,11 +262,7 @@ export function runPython(args: string[], dir: string, spawn: SpawnFn = defaultS
     };
   }
   if (r.status !== 0) {
-    return {
-      ok: false,
-      reason: 'failed',
-      message: `covtrim: ${cmd.join(' ')} failed with exit code ${r.status}\n${r.stderr.trimEnd()}`,
-    };
+    return { ok: false, reason: 'failed', message: spawnFailure(cmd, r) };
   }
   const lcov = readLcov(dir);
   if (lcov === null) {
@@ -288,22 +300,12 @@ export function runDeno(args: string[], dir: string, spawn: SpawnFn = defaultSpa
       };
     }
     if (r1.status !== 0) {
-      return {
-        ok: false,
-        reason: 'failed',
-        message: `covtrim: ${testCmd.join(' ')} failed with exit code ${r1.status}\n${r1.stderr.trimEnd()}`,
-      };
+      return { ok: false, reason: 'failed', message: spawnFailure(testCmd, r1) };
     }
     const covCmd = ['deno', 'coverage', '--lcov', profileDir];
     const r2 = spawn(covCmd, { cwd: dir });
     if (r2.error || r2.status !== 0) {
-      return {
-        ok: false,
-        reason: 'failed',
-        message: `covtrim: ${covCmd.join(' ')} failed${
-          r2.status !== null ? ` with exit code ${r2.status}` : ''
-        }\n${r2.stderr.trimEnd()}`,
-      };
+      return { ok: false, reason: 'failed', message: spawnFailure(covCmd, r2) };
     }
     const lcov = r2.stdout ?? '';
     if (!lcov.includes('end_of_record')) {
