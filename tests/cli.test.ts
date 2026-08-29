@@ -190,7 +190,8 @@ describe('covtrim CLI', () => {
       });
       const { code, err } = runNodeIn(dir, ['--tokens'], okSpawn);
       expect(code).toBe(0);
-      expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \(-\d+%\)/);
+      // 小输入下输出可能更大，符号可为 + 或 -（同 #644 教训）
+      expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \([+-]\d+%\)/);
       rmSync(dir, { recursive: true, force: true });
     });
   });

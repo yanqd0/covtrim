@@ -71,16 +71,17 @@ export function main(argv: string[], io: CliIo = defaultIo, deps: MainDeps = {})
   program
     .command('node')
     .description('Run Node tests via the detected framework and compress coverage into TSV')
-    .argument('[args...]', 'arguments forwarded to the test runner')
     .option('--framework <name>', 'test framework to use (auto-detected otherwise)')
-    .option('--tokens', 'print token usage stats to stderr')
-    .action((args: string[], opts: { framework?: string; tokens?: boolean }) => {
+    .argument('[args...]', 'arguments forwarded to the test runner')
+    .action((args: string[], opts: { framework?: string }) => {
+      // --tokens 声明在根命令：commander 同名 option 归父命令，故读根 opts
+      const rootOpts = program.opts();
       const code = runNodeCommand(
         deps.cwd ?? process.cwd(),
         args,
         opts.framework,
         io,
-        opts.tokens === true,
+        rootOpts.tokens === true,
         deps.spawn
       );
       if (code !== 0) throw new CLIExit(code);
