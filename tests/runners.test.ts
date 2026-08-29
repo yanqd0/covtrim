@@ -6,6 +6,7 @@ import {
   detectNodeFramework,
   NODE_FRAMEWORKS,
   runNodeFramework,
+  runRust,
   type NodeFramework,
   type NodeFrameworkSpec,
   type SpawnFn,
@@ -137,6 +138,80 @@ describe('runNodeFramework', () => {
       '--only',
       'math',
     ]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('runRust', () => {
+  const RUST_LCOV = 'SF:src/lib.rs\nLF:5\nLH:3\nend_of_record\n';
+  const okRust: SpawnFn = () => ({ status: 0, stdout: RUST_LCOV, stderr: '' });
+
+  it('returns lcov from stdout on success', () => {
+    const dir = makeProject({ 'package.json': '{}' });
+    expect(runRust([], dir, okRust)).toEqual({ ok: true, lcov: RUST_LCOV });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reports missing cargo with rustup hint on spawn error', () => {
+    const missing: SpawnFn = () => ({
+      status: null,
+      stdout: '',
+      stderr: '',
+      error: new Error('ENOENT'),
+    });
+    const dir = makeProject({ 'package.json': '{}' });
+    const r = runRust([], dir, missing);
+    expect(r).toMatchObject({ ok: false, reason: 'missing-cargo' });
+    if (!r.ok) expect(r.message).toContain('https://rustup.rs');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('suggests installing cargo-llvm-cov when the plugin is missing', () => {
+    const noPlugin: SpawnFn = () => ({
+      status: 101,
+      stdout: '',
+      stderr: 'error: no such command: llvm-cov\n',
+    });
+    const dir = makeProject({ 'package.json': '{}' });
+    const r = runRust([], dir, noPlugin);
+    expect(r).toMatchObject({ ok: false, reason: 'missing-llvm-cov' });
+    if (!r.ok) expect(r.message).toContain('cargo install cargo-llvm-cov');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('forwards stderr and exit code when tests fail', () => {
+    const fail: SpawnFn = () => ({
+      status: 101,
+      stdout: '',
+      stderr: 'test result: FAILED. 1 failed\n',
+    });
+    const dir = makeProject({ 'package.json': '{}' });
+    const r = runRust([], dir, fail);
+    expect(r).toMatchObject({ ok: false, reason: 'failed' });
+    if (!r.ok) {
+      expect(r.message).toContain('exit code 101');
+      expect(r.message).toContain('1 failed');
+    }
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reports no-lcov when stdout has no lcov', () => {
+    const noLcov: SpawnFn = () => ({ status: 0, stdout: 'not lcov', stderr: '' });
+    const dir = makeProject({ 'package.json': '{}' });
+    const r = runRust([], dir, noLcov);
+    expect(r).toMatchObject({ ok: false, reason: 'no-lcov' });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('forwards args to cargo llvm-cov', () => {
+    const seen: string[][] = [];
+    const spy: SpawnFn = (cmd) => {
+      seen.push(cmd);
+      return { status: 0, stdout: RUST_LCOV, stderr: '' };
+    };
+    const dir = makeProject({ 'package.json': '{}' });
+    runRust(['--', '--test-threads=1'], dir, spy);
+    expect(seen[0]).toEqual(['cargo', 'llvm-cov', '--lcov', '--', '--test-threads=1']);
     rmSync(dir, { recursive: true, force: true });
   });
 });
