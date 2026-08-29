@@ -1,5 +1,21 @@
 # Change Log
 
+## 0.2.0
+
+### Features
+
+- Multi-language coverage input: auto-detect the lcov format and validate real samples from Rust / Python / Node tooling.
+- New `covtrim node`: wraps 6 Node test frameworks (vitest / jest / c8 / mocha+nyc / bun / node:test) with auto-detection and `--framework`.
+- New `covtrim rust`: wraps `cargo llvm-cov` and pipes lcov from stdout.
+- New `covtrim python`: wraps pytest-cov and reads `coverage/lcov.info`.
+- New `covtrim deno`: wraps built-in `deno test` + `deno coverage --lcov`.
+
+### Others
+
+- Docs: rewrite README in English (promotion & usage only), add CONTRIBUTING.md for human contributors, add doc-tier and language rules to CLAUDE.md.
+- CI: upload coverage to Codecov and add the coverage badge.
+- Tests: multi-language integration suites over real toolchains (node/rust/python/deno demo fixtures) behind a unified local/CI toggle.
+
 ## 0.1.1
 
 ### Others
