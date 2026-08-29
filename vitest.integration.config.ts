@@ -7,6 +7,7 @@ export default defineConfig({
       'tests/integration-node.itest.ts',
       'tests/integration-rust.itest.ts',
       'tests/integration-python.itest.ts',
+      'tests/integration-deno.itest.ts',
     ],
   },
 });

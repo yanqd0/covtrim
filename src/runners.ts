@@ -1,5 +1,7 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 /** Node 测试框架标识。 */
 export type NodeFramework = 'vitest' | 'jest' | 'c8' | 'mocha-nyc' | 'bun' | 'node-test';
@@ -259,4 +261,60 @@ export function runPython(args: string[], dir: string, spawn: SpawnFn = defaultS
     };
   }
   return { ok: true, lcov };
+}
+
+/** deno 子命令运行结果。 */
+export type DenoRunResult =
+  | { ok: true; lcov: string }
+  | { ok: false; reason: 'missing-deno' | 'failed' | 'no-lcov'; message: string };
+
+/**
+ * 运行 deno 覆盖率链路（两步）：`deno test --coverage=<tmp>` 收集 → `deno coverage --lcov <tmp>` 输出 stdout。
+ *
+ * 与 rust 同通道（stdout lcov），但需两步 + 临时 profile 目录（os.tmpdir，finally 清理，不污染项目）。
+ * 错误分层：step1 spawn 失败（deno 缺失）→ missing-deno + deno.com 提示；step1 非 0（测试失败）→ failed + stderr 尾部；
+ * step2 失败 → failed；step2 stdout 无 lcov → no-lcov。
+ */
+export function runDeno(args: string[], dir: string, spawn: SpawnFn = defaultSpawn): DenoRunResult {
+  const profileDir = mkdtempSync(join(tmpdir(), 'covtrim-deno-'));
+  try {
+    const testCmd = ['deno', 'test', `--coverage=${profileDir}`, ...args];
+    const r1 = spawn(testCmd, { cwd: dir });
+    if (r1.error) {
+      return {
+        ok: false,
+        reason: 'missing-deno',
+        message: 'covtrim: deno not found — Install Deno: https://deno.com',
+      };
+    }
+    if (r1.status !== 0) {
+      return {
+        ok: false,
+        reason: 'failed',
+        message: `covtrim: ${testCmd.join(' ')} failed with exit code ${r1.status}\n${r1.stderr.trimEnd()}`,
+      };
+    }
+    const covCmd = ['deno', 'coverage', '--lcov', profileDir];
+    const r2 = spawn(covCmd, { cwd: dir });
+    if (r2.error || r2.status !== 0) {
+      return {
+        ok: false,
+        reason: 'failed',
+        message: `covtrim: ${covCmd.join(' ')} failed${
+          r2.status !== null ? ` with exit code ${r2.status}` : ''
+        }\n${r2.stderr.trimEnd()}`,
+      };
+    }
+    const lcov = r2.stdout ?? '';
+    if (!lcov.includes('end_of_record')) {
+      return {
+        ok: false,
+        reason: 'no-lcov',
+        message: `covtrim: ${covCmd.join(' ')} produced no lcov on stdout`,
+      };
+    }
+    return { ok: true, lcov };
+  } finally {
+    rmSync(profileDir, { recursive: true, force: true });
+  }
 }

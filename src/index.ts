@@ -8,6 +8,7 @@ import { parseLcov } from './lcov.ts';
 import {
   detectNodeFramework,
   NODE_FRAMEWORKS,
+  runDeno,
   runNodeFramework,
   runPython,
   runRust,
@@ -114,6 +115,23 @@ export function main(argv: string[], io: CliIo = defaultIo, deps: MainDeps = {})
       // --tokens 声明在根命令：读根 opts（同 node/rust）
       const rootOpts = program.opts();
       const code = runPythonCommand(
+        deps.cwd ?? process.cwd(),
+        args,
+        io,
+        rootOpts.tokens === true,
+        deps.spawn
+      );
+      if (code !== 0) throw new CLIExit(code);
+    });
+
+  program
+    .command('deno')
+    .description('Run Deno tests with coverage and compress into TSV')
+    .argument('[args...]', 'arguments forwarded to deno test')
+    .action((args: string[]) => {
+      // --tokens 声明在根命令：读根 opts（同 node/rust/python）
+      const rootOpts = program.opts();
+      const code = runDenoCommand(
         deps.cwd ?? process.cwd(),
         args,
         io,
@@ -278,6 +296,40 @@ function runPythonCommand(
   const records = parseLcov(result.lcov);
   if (records.length === 0) {
     io.stderr('covtrim: no coverage records found in coverage/lcov.info');
+    return 1;
+  }
+  const tsv = toTsv(records);
+  io.stdout(tsv);
+  if (showTokens) {
+    const stats = tokenStats(result.lcov, tsv);
+    io.stderr(
+      `tokens: ${stats.inputTokens} → ${stats.outputTokens} (${stats.savedPct >= 0 ? '-' : '+'}${Math.abs(stats.savedPct)}%)`
+    );
+  }
+  return 0;
+}
+
+/**
+ * `covtrim deno`：两步运行 deno 覆盖率（test 收集 → coverage --lcov）→ stdout lcov → 输出 TSV。
+ *
+ * @param cwd 项目目录（deno 命令基准）
+ * @returns 退出码（0 成功，1 失败）
+ */
+function runDenoCommand(
+  cwd: string,
+  args: string[],
+  io: CliIo,
+  showTokens: boolean,
+  spawn?: SpawnFn
+): number {
+  const result = runDeno(args, cwd, spawn);
+  if (!result.ok) {
+    io.stderr(result.message);
+    return 1;
+  }
+  const records = parseLcov(result.lcov);
+  if (records.length === 0) {
+    io.stderr('covtrim: no coverage records found in lcov output');
     return 1;
   }
   const tsv = toTsv(records);
