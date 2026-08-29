@@ -1,10 +1,12 @@
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
-// 集成验证：真实跑框架（非 mock）。需本机工具链；vitest 必装（covtrim 自身依赖），其余探测可用则跑、否则 skip。
+// 集成验证：真实跑框架（非 mock）。框架统一安装在 node-demo 的 node_modules（package.json 管理），
+// PATH 注入 demo 的 .bin；探测 demo 内框架，装了即跑。
 const ROOT = process.cwd();
-const BIN = `${ROOT}/node_modules/.bin`;
+const ROOT_BIN = `${ROOT}/node_modules/.bin`;
 const DEMO = `${ROOT}/tests/fixtures/projects/node-demo`;
+const DEMO_BIN = `${DEMO}/node_modules/.bin`;
 const FAILING = `${ROOT}/tests/fixtures/projects/node-demo-failing`;
 
 interface CovtrimResult {
@@ -13,18 +15,22 @@ interface CovtrimResult {
   err: string;
 }
 
-/** 在指定 cwd 下运行 covtrim node（PATH 注入项目 node_modules/.bin，供 vitest 等从父目录链解析）。 */
+/** 在指定 cwd 下运行 covtrim node（PATH 注入 demo 与项目 .bin）。 */
 function covtrimNode(args: string[], cwd: string): CovtrimResult {
   const r = spawnSync('tsx', [`${ROOT}/src/index.ts`, 'node', ...args], {
     cwd,
     encoding: 'utf8',
-    env: { ...process.env, PATH: `${BIN}:${process.env.PATH ?? ''}` },
+    env: { ...process.env, PATH: `${DEMO_BIN}:${ROOT_BIN}:${process.env.PATH ?? ''}` },
   });
   return { code: r.status ?? -1, out: r.stdout ?? '', err: r.stderr ?? '' };
 }
 
+/** 探测框架：查 demo 的 node_modules/.bin（与执行路径一致）。 */
 function toolAvailable(cmd: string): boolean {
-  const r = spawnSync(cmd, ['--version'], { encoding: 'utf8' });
+  const r = spawnSync(cmd, ['--version'], {
+    env: { ...process.env, PATH: `${DEMO_BIN}:${ROOT_BIN}:${process.env.PATH ?? ''}` },
+    encoding: 'utf8',
+  });
   return r.error === undefined && r.status === 0;
 }
 

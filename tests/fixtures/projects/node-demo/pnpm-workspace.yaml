@@ -1,0 +1,5 @@
+# 独立 workspace：隔离父 covtrim workspace（pnpm-workspace.yaml），demo 依赖自建 lock/node_modules。
+packages: []
+allowBuilds:
+  bun: true
+  esbuild: true
