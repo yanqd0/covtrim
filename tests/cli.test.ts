@@ -1,5 +1,20 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { main } from '../src/index.ts';
+import type { SpawnFn } from '../src/runners.ts';
+
+/** 建临时项目（写入指定文件），返回目录；测试后删除。 */
+function makeProj(files: Record<string, string>): string {
+  const dir = mkdtempSync(join(tmpdir(), 'covtrim-cli-'));
+  for (const [name, content] of Object.entries(files)) {
+    const target = join(dir, name);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, content);
+  }
+  return dir;
+}
 
 function run(argv: string[]): { code: number; out: string[]; err: string[] } {
   const out: string[] = [];
@@ -10,6 +25,28 @@ function run(argv: string[]): { code: number; out: string[]; err: string[] } {
   });
   return { code, out, err };
 }
+
+/** 在指定目录 + mock spawn 下运行 `covtrim node`。 */
+function runNodeIn(
+  dir: string,
+  argv: string[],
+  spawn: SpawnFn
+): { code: number; out: string[]; err: string[] } {
+  const out: string[] = [];
+  const err: string[] = [];
+  const code = main(
+    ['node', 'covtrim', 'node', ...argv],
+    {
+      stdout: (s) => out.push(s),
+      stderr: (s) => err.push(s),
+    },
+    { cwd: dir, spawn }
+  );
+  return { code, out, err };
+}
+
+const okSpawn: SpawnFn = () => ({ status: 0, stderr: '' });
+const NODE_LCOV = 'SF:src/math.js\nLF:4\nLH:3\nend_of_record\n';
 
 describe('covtrim CLI', () => {
   it('reports the version', () => {
@@ -76,6 +113,66 @@ describe('covtrim CLI', () => {
       const { code, err } = run(['fixtures/empty.info']);
       expect(code).toBe(1);
       expect(err.join('\n')).toContain('unsupported format');
+    });
+  });
+
+  describe('node command', () => {
+    it('runs the detected framework and prints TSV', () => {
+      const dir = makeProj({
+        'package.json': '{"devDependencies":{"vitest":"^3"}}',
+        'coverage/lcov.info': NODE_LCOV,
+      });
+      const { code, out } = runNodeIn(dir, [], okSpawn);
+      expect(code).toBe(0);
+      expect(out.join('\n')).toBe('file\tuncovered\ttotal\tpct\nsrc/math.js\t1\t4\t75.0');
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('respects --framework override', () => {
+      const dir = makeProj({ 'package.json': '{}', 'coverage/lcov.info': NODE_LCOV });
+      const { code, out } = runNodeIn(dir, ['--framework', 'jest'], okSpawn);
+      expect(code).toBe(0);
+      expect(out.join('\n')).toContain('src/math.js');
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('errors on unknown framework', () => {
+      const dir = makeProj({ 'package.json': '{}' });
+      const { code, err } = runNodeIn(dir, ['--framework', 'bogus'], okSpawn);
+      expect(code).toBe(1);
+      expect(err.join('\n')).toContain('unknown framework "bogus"');
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('errors when no framework is detected', () => {
+      const dir = makeProj({ 'package.json': '{}' });
+      const { code, err } = runNodeIn(dir, [], okSpawn);
+      expect(code).toBe(1);
+      expect(err.join('\n')).toContain('no test framework detected');
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('forwards missing-tool install hint when spawn errors', () => {
+      const dir = makeProj({ 'package.json': '{"devDependencies":{"vitest":"^3"}}' });
+      const missingSpawn: SpawnFn = () => ({
+        status: null,
+        stderr: '',
+        error: new Error('ENOENT'),
+      });
+      const { code, err } = runNodeIn(dir, [], missingSpawn);
+      expect(code).toBe(1);
+      expect(err.join('\n')).toContain('npm i -D vitest @vitest/coverage-v8');
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('forwards test failure stderr and exit code', () => {
+      const dir = makeProj({ 'package.json': '{"devDependencies":{"jest":"^29"}}' });
+      const failSpawn: SpawnFn = () => ({ status: 1, stderr: 'intentional\n' });
+      const { code, err } = runNodeIn(dir, ['--framework', 'jest'], failSpawn);
+      expect(code).toBe(1);
+      expect(err.join('\n')).toContain('exit code 1');
+      expect(err.join('\n')).toContain('intentional');
+      rmSync(dir, { recursive: true, force: true });
     });
   });
 });

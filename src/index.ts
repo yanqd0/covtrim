@@ -5,6 +5,13 @@ import { fileURLToPath } from 'node:url';
 import pkg from '../package.json' with { type: 'json' };
 import { detectFormat } from './detect.ts';
 import { parseLcov } from './lcov.ts';
+import {
+  detectNodeFramework,
+  NODE_FRAMEWORKS,
+  runNodeFramework,
+  type NodeFrameworkSpec,
+  type SpawnFn,
+} from './runners.ts';
 import { toTsv, tokenStats } from './tsv.ts';
 
 /** CLI 退出信号：库模式（测试）下由调用方捕获，不直接 process.exit。 */
@@ -30,6 +37,12 @@ export interface CliIo {
   stderr: (s: string) => void;
 }
 
+/** main 依赖注入：node 子命令的工作目录与命令执行器（测试用）。 */
+export interface MainDeps {
+  cwd?: string;
+  spawn?: SpawnFn;
+}
+
 const defaultIo: CliIo = { stdout: writeOut, stderr: writeErr };
 
 /**
@@ -39,7 +52,7 @@ const defaultIo: CliIo = { stdout: writeOut, stderr: writeErr };
  * @param io   输出通道，默认写 stdout
  * @returns    退出码（0 成功，非 0 失败）
  */
-export function main(argv: string[], io: CliIo = defaultIo): number {
+export function main(argv: string[], io: CliIo = defaultIo, deps: MainDeps = {}): number {
   const program = new Command();
   program
     .name('covtrim')
@@ -52,6 +65,24 @@ export function main(argv: string[], io: CliIo = defaultIo): number {
     .description('Compress an lcov report into a compact TSV summary')
     .action((lcovFile: string, opts: { tokens?: boolean }) => {
       const code = runReport(lcovFile, io, opts.tokens === true);
+      if (code !== 0) throw new CLIExit(code);
+    });
+
+  program
+    .command('node')
+    .description('Run Node tests via the detected framework and compress coverage into TSV')
+    .argument('[args...]', 'arguments forwarded to the test runner')
+    .option('--framework <name>', 'test framework to use (auto-detected otherwise)')
+    .option('--tokens', 'print token usage stats to stderr')
+    .action((args: string[], opts: { framework?: string; tokens?: boolean }) => {
+      const code = runNodeCommand(
+        deps.cwd ?? process.cwd(),
+        args,
+        opts.framework,
+        io,
+        opts.tokens === true,
+        deps.spawn
+      );
       if (code !== 0) throw new CLIExit(code);
     });
 
@@ -99,6 +130,58 @@ function runReport(lcovFile: string, io: CliIo, showTokens: boolean): number {
   if (showTokens) {
     const stats = tokenStats(text, tsv);
     io.stderr(`tokens: ${stats.inputTokens} → ${stats.outputTokens} (${stats.savedPct >= 0 ? '-' : '+'}${Math.abs(stats.savedPct)}%)`);
+  }
+  return 0;
+}
+
+/**
+ * `covtrim node`：检测/指定框架 → 运行测试 → 取 coverage/lcov.info → 输出 TSV。
+ *
+ * @param cwd        项目目录（detect 与 spawn 的基准）
+ * @param framework  显式框架名（undefined → 自动检测）
+ * @returns 退出码（0 成功，1 失败）
+ */
+function runNodeCommand(
+  cwd: string,
+  args: string[],
+  framework: string | undefined,
+  io: CliIo,
+  showTokens: boolean,
+  spawn?: SpawnFn
+): number {
+  const supported = NODE_FRAMEWORKS.map((f) => f.name).join(', ');
+  let spec: NodeFrameworkSpec | undefined;
+  if (framework !== undefined) {
+    spec = NODE_FRAMEWORKS.find((f) => f.name === framework);
+    if (!spec) {
+      io.stderr(`covtrim: unknown framework "${framework}" (supported: ${supported})`);
+      return 1;
+    }
+  } else {
+    // detected 为 null 时 find 恒不命中（无 name 等于 null），无需非空断言
+    spec = NODE_FRAMEWORKS.find((f) => f.name === detectNodeFramework(cwd));
+    if (!spec) {
+      io.stderr(`covtrim: no test framework detected in ${cwd} (supported: ${supported})`);
+      return 1;
+    }
+  }
+  const result = runNodeFramework(spec, args, cwd, spawn);
+  if (!result.ok) {
+    io.stderr(result.message);
+    return 1;
+  }
+  const records = parseLcov(result.lcov);
+  if (records.length === 0) {
+    io.stderr('covtrim: no coverage records found in coverage/lcov.info');
+    return 1;
+  }
+  const tsv = toTsv(records);
+  io.stdout(tsv);
+  if (showTokens) {
+    const stats = tokenStats(result.lcov, tsv);
+    io.stderr(
+      `tokens: ${stats.inputTokens} → ${stats.outputTokens} (${stats.savedPct >= 0 ? '-' : '+'}${Math.abs(stats.savedPct)}%)`
+    );
   }
   return 0;
 }

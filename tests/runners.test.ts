@@ -1,0 +1,142 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import {
+  detectNodeFramework,
+  NODE_FRAMEWORKS,
+  runNodeFramework,
+  type NodeFramework,
+  type NodeFrameworkSpec,
+  type SpawnFn,
+} from '../src/runners.ts';
+
+/** 按名称取框架规格（表内必有，守卫替代非空断言）。 */
+function framework(name: NodeFramework): NodeFrameworkSpec {
+  const spec = NODE_FRAMEWORKS.find((f) => f.name === name);
+  if (spec === undefined) throw new Error(`framework ${name} not in table`);
+  return spec;
+}
+
+/** 建临时项目（写入指定文件），返回目录；测试后删除。 */
+function makeProject(files: Record<string, string>): string {
+  const dir = mkdtempSync(join(tmpdir(), 'covtrim-runner-'));
+  for (const [name, content] of Object.entries(files)) {
+    const target = join(dir, name);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, content);
+  }
+  return dir;
+}
+
+const okSpawn: SpawnFn = () => ({ status: 0, stderr: '' });
+
+const LCOV = 'SF:a.ts\nLF:5\nLH:3\nend_of_record\n';
+
+describe('detectNodeFramework', () => {
+  it('detects vitest from devDependencies', () => {
+    const dir = makeProject({ 'package.json': '{"devDependencies":{"vitest":"^3"}}' });
+    expect(detectNodeFramework(dir)).toBe('vitest');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('detects jest from jest.config', () => {
+    const dir = makeProject({ 'package.json': '{}', 'jest.config.js': 'module.exports = {};' });
+    expect(detectNodeFramework(dir)).toBe('jest');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('detects c8 from devDependencies', () => {
+    const dir = makeProject({ 'package.json': '{"devDependencies":{"c8":"^10"}}' });
+    expect(detectNodeFramework(dir)).toBe('c8');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('detects mocha+nyc from devDependencies', () => {
+    const dir = makeProject({ 'package.json': '{"devDependencies":{"mocha":"^10","nyc":"^17"}}' });
+    expect(detectNodeFramework(dir)).toBe('mocha-nyc');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('detects bun from bun.lockb', () => {
+    const dir = makeProject({ 'package.json': '{}', 'bun.lockb': '' });
+    expect(detectNodeFramework(dir)).toBe('bun');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('detects node-test from scripts.test containing node --test', () => {
+    const dir = makeProject({ 'package.json': '{"scripts":{"test":"node --test"}}' });
+    expect(detectNodeFramework(dir)).toBe('node-test');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('returns null when no framework matches', () => {
+    const dir = makeProject({ 'package.json': '{}' });
+    expect(detectNodeFramework(dir)).toBeNull();
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('runNodeFramework', () => {
+  it('returns lcov on success (status 0 + coverage/lcov.info)', () => {
+    const vitest = framework('vitest');
+    const dir = makeProject({
+      'package.json': '{"devDependencies":{"vitest":"^3"}}',
+      'coverage/lcov.info': LCOV,
+    });
+    expect(runNodeFramework(vitest, [], dir, okSpawn)).toEqual({ ok: true, lcov: LCOV });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reports missing tool with install hint when spawn errors', () => {
+    const jest = framework('jest');
+    const missingSpawn: SpawnFn = () => ({ status: null, stderr: '', error: new Error('ENOENT') });
+    const dir = makeProject({ 'package.json': '{}' });
+    const r = runNodeFramework(jest, [], dir, missingSpawn);
+    expect(r).toMatchObject({ ok: false, reason: 'missing-tool' });
+    if (!r.ok) expect(r.message).toContain('npm i -D jest');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('forwards stderr and exit code when the command fails', () => {
+    const c8 = framework('c8');
+    const failSpawn: SpawnFn = () => ({ status: 2, stderr: 'Assertion failed: boom\n' });
+    const dir = makeProject({ 'package.json': '{"devDependencies":{"c8":"^10"}}' });
+    const r = runNodeFramework(c8, [], dir, failSpawn);
+    expect(r).toMatchObject({ ok: false, reason: 'failed' });
+    if (!r.ok) {
+      expect(r.message).toContain('exit code 2');
+      expect(r.message).toContain('boom');
+    }
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reports no-lcov when the command succeeds without coverage/lcov.info', () => {
+    const vitest = framework('vitest');
+    const dir = makeProject({ 'package.json': '{"devDependencies":{"vitest":"^3"}}' });
+    const r = runNodeFramework(vitest, [], dir, okSpawn);
+    expect(r).toMatchObject({ ok: false, reason: 'no-lcov' });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('forwards args to the framework command', () => {
+    const bun = framework('bun');
+    const seen: string[][] = [];
+    const spySpawn: SpawnFn = (cmd) => {
+      seen.push(cmd);
+      return { status: 0, stderr: '' };
+    };
+    const dir = makeProject({ 'package.json': '{}', 'bun.lockb': '', 'coverage/lcov.info': LCOV });
+    runNodeFramework(bun, ['--only', 'math'], dir, spySpawn);
+    expect(seen[0]).toEqual([
+      'bun',
+      'test',
+      '--coverage',
+      '--coverage-reporter',
+      'lcov',
+      '--only',
+      'math',
+    ]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
