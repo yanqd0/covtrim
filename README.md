@@ -22,6 +22,8 @@ npx covtrim <args>
 ```bash
 covtrim <lcovFile>           # compress lcov → TSV summary sorted by uncovered lines
 covtrim <lcovFile> --tokens  # include token-quantification stats (stderr, off by default)
+covtrim node [args]          # run Node tests (auto-detected framework) → TSV
+covtrim node --framework vitest  # pick the test framework explicitly
 covtrim --version            # print version
 covtrim --help               # show help
 ```
@@ -39,7 +41,7 @@ covtrim --help               # show help
 - `--diff`: baseline regression detection (improved / regressed / newly-uncovered)
 - `--fail-under <N>`: CI gate with exit code
 - `--summary`: one-line digest for LLM context ("12 modules, 3 below 90%, needs X")
-- Adapters: `llvm-cov` first; `pytest-cov` and more next (lcov core is language-agnostic)
+- Adapters: ✅ `covtrim node` (vitest / jest / c8 / mocha+nyc / bun / node:test) — 0.2.0; `llvm-cov` (Rust) and `pytest-cov` (Python) next
 
 ## Status
 
