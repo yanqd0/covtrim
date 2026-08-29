@@ -64,9 +64,29 @@ function runRustIn(
   return { code, out, err };
 }
 
+/** 在指定目录 + mock spawn 下运行 `covtrim python`。 */
+function runPythonIn(
+  dir: string,
+  argv: string[],
+  spawn: SpawnFn
+): { code: number; out: string[]; err: string[] } {
+  const out: string[] = [];
+  const err: string[] = [];
+  const code = main(
+    ['node', 'covtrim', 'python', ...argv],
+    {
+      stdout: (s) => out.push(s),
+      stderr: (s) => err.push(s),
+    },
+    { cwd: dir, spawn }
+  );
+  return { code, out, err };
+}
+
 const okSpawn: SpawnFn = () => ({ status: 0, stderr: '' });
 const NODE_LCOV = 'SF:src/math.js\nLF:4\nLH:3\nend_of_record\n';
 const RUST_LCOV = 'SF:src/lib.rs\nLF:5\nLH:3\nend_of_record\n';
+const PY_LCOV = 'SF:src/math.py\nLF:4\nLH:2\nend_of_record\n';
 
 describe('covtrim CLI', () => {
   it('reports the version', () => {
@@ -255,6 +275,50 @@ describe('covtrim CLI', () => {
       const { code, err } = runRustIn(dir, [], fail);
       expect(code).toBe(1);
       expect(err.join('\n')).toContain('exit code 101');
+      expect(err.join('\n')).toContain('1 failed');
+      rmSync(dir, { recursive: true, force: true });
+    });
+  });
+
+  describe('python command', () => {
+    const pyOk: SpawnFn = () => ({ status: 0, stderr: '' });
+
+    it('runs pytest-cov and prints TSV from coverage/lcov.info', () => {
+      const dir = makeProj({ 'package.json': '{}', 'coverage/lcov.info': PY_LCOV });
+      const { code, out } = runPythonIn(dir, [], pyOk);
+      expect(code).toBe(0);
+      expect(out.join('\n')).toBe('file\tuncovered\ttotal\tpct\nsrc/math.py\t2\t4\t50.0');
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('prints token stats with --tokens', () => {
+      const dir = makeProj({ 'package.json': '{}', 'coverage/lcov.info': PY_LCOV });
+      const { code, err } = runPythonIn(dir, ['--tokens'], pyOk);
+      expect(code).toBe(0);
+      expect(err.join('\n')).toMatch(/tokens: \d+ → \d+ \([+-]\d+%\)/);
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('forwards missing-pytest install hint', () => {
+      const dir = makeProj({ 'package.json': '{}' });
+      const missing: SpawnFn = () => ({
+        status: null,
+        stdout: '',
+        stderr: '',
+        error: new Error('ENOENT'),
+      });
+      const { code, err } = runPythonIn(dir, [], missing);
+      expect(code).toBe(1);
+      expect(err.join('\n')).toContain('pip install pytest pytest-cov');
+      rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('forwards test failure stderr and exit code', () => {
+      const dir = makeProj({ 'package.json': '{}' });
+      const fail: SpawnFn = () => ({ status: 1, stdout: '', stderr: '1 failed\n' });
+      const { code, err } = runPythonIn(dir, [], fail);
+      expect(code).toBe(1);
+      expect(err.join('\n')).toContain('exit code 1');
       expect(err.join('\n')).toContain('1 failed');
       rmSync(dir, { recursive: true, force: true });
     });

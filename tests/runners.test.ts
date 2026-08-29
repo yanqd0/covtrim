@@ -6,6 +6,7 @@ import {
   detectNodeFramework,
   NODE_FRAMEWORKS,
   runNodeFramework,
+  runPython,
   runRust,
   type NodeFramework,
   type NodeFrameworkSpec,
@@ -212,6 +213,66 @@ describe('runRust', () => {
     const dir = makeProject({ 'package.json': '{}' });
     runRust(['--', '--test-threads=1'], dir, spy);
     expect(seen[0]).toEqual(['cargo', 'llvm-cov', '--lcov', '--', '--test-threads=1']);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('runPython', () => {
+  const PY_LCOV = 'SF:src/math.py\nLF:4\nLH:2\nend_of_record\n';
+  const okPy: SpawnFn = () => ({ status: 0, stderr: '' });
+
+  it('returns lcov from coverage/lcov.info on success', () => {
+    const dir = makeProject({ 'package.json': '{}', 'coverage/lcov.info': PY_LCOV });
+    expect(runPython([], dir, okPy)).toEqual({ ok: true, lcov: PY_LCOV });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reports missing pytest with pip hint on spawn error', () => {
+    const missing: SpawnFn = () => ({
+      status: null,
+      stdout: '',
+      stderr: '',
+      error: new Error('ENOENT'),
+    });
+    const dir = makeProject({ 'package.json': '{}' });
+    const r = runPython([], dir, missing);
+    expect(r).toMatchObject({ ok: false, reason: 'missing-pytest' });
+    if (!r.ok) expect(r.message).toContain('pip install pytest pytest-cov');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('forwards stderr and exit code when tests fail', () => {
+    const fail: SpawnFn = () => ({
+      status: 1,
+      stdout: '',
+      stderr: 'short test summary info: 1 failed\n',
+    });
+    const dir = makeProject({ 'package.json': '{}' });
+    const r = runPython([], dir, fail);
+    expect(r).toMatchObject({ ok: false, reason: 'failed' });
+    if (!r.ok) {
+      expect(r.message).toContain('exit code 1');
+      expect(r.message).toContain('1 failed');
+    }
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reports no-lcov when coverage/lcov.info is missing', () => {
+    const dir = makeProject({ 'package.json': '{}' });
+    const r = runPython([], dir, okPy);
+    expect(r).toMatchObject({ ok: false, reason: 'no-lcov' });
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('forwards args to pytest', () => {
+    const seen: string[][] = [];
+    const spy: SpawnFn = (cmd) => {
+      seen.push(cmd);
+      return { status: 0, stdout: '', stderr: '' };
+    };
+    const dir = makeProject({ 'package.json': '{}', 'coverage/lcov.info': PY_LCOV });
+    runPython(['-x'], dir, spy);
+    expect(seen[0]).toEqual(['pytest', '--cov', '--cov-report=lcov:coverage/lcov.info', '-x']);
     rmSync(dir, { recursive: true, force: true });
   });
 });
