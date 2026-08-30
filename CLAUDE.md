@@ -16,6 +16,15 @@ Token 高效覆盖率压缩工具：读取标准 **lcov** → 输出紧凑 TSV �
 - **文档分工（文件作用）**：README=对外推广/使用（用户）；CONTRIBUTING=对外开发须知（人类贡献者）；CLAUDE.md=对内 AI 导航；notes/=对内文档化记忆。新文档先定读者，再定放哪。
 - **语言约束**：对外默认文件英文（README / CONTRIBUTING / CHANGELOG / LICENSE / docs/）；对内默认中文（CLAUDE.md / notes/ / 代码注释）；CLI 输出英文、标识符英文。
 
+## 覆盖率纪律（强制）
+
+> 对**所有**读取本文档的 AI 生效：覆盖率数据一律经 covtrim 压缩后再引用，禁止贴原始 lcov / vitest 长输出。
+
+- 本仓库需要新鲜覆盖率 → `pnpm dogfood`（=`pnpm test:coverage` + `tsx src/index.ts --tokens coverage/lcov.info`）；`coverage/lcov.info` 已存在时可直接 `tsx src/index.ts --tokens coverage/lcov.info`。
+- 他项目 / 临时 lcov → `covtrim <lcov>`（或 `npx covtrim <lcov>`）。
+- 汇报格式：引用 top 未覆盖文件（`file / uncovered / total / pct`）+ 一句话解读（哪个文件缺测、差多少），不罗列全部行。
+- commit 前自查：本次改动涉及的文件若出现在未覆盖列表，须说明理由或补测试后重跑 `pnpm dogfood`。
+
 ## 常用命令
 
 ```bash
